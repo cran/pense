@@ -1,0 +1,4 @@
+- update ENLars to allow faster grid traversal
+- add standardize flag to elnet() and elnet_cv()
+- standardize data using the mscale instead of median/mad
+    - define lmax using covGK and mscale.

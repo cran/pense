@@ -1,14 +1,14 @@
 Package: pense
 Type: Package
 Title: Penalized Elastic Net S/MM-Estimator of Regression
-Version: 1.0.8
-Date: 2017-11-02
+Version: 1.2.0
+Date: 2018-03-08
 Authors@R: c(
     person("David", "Kepplinger", , "david.kepplinger@gmail.com",
         role = c("aut", "cre")),
-    person("Derek", "Cho", role = "aut"),
     person("Matias", "Salibian-Barrera", role = c("aut")),
-    person("Gabriela", "Cohen Freue", role = "aut")
+    person("Gabriela", "Cohen Freue", role = "aut"),
+    person("Derek", "Cho", role = "ctb")
     )
 Copyright: See the file COPYRIGHTS for copyright details on some of the
         functions and algorithms used.
@@ -27,11 +27,11 @@ Suggests: testthat, lars
 License: GPL (>= 2)
 NeedsCompilation: yes
 RoxygenNote: 6.0.1
-Packaged: 2017-11-03 00:21:56 UTC; david
+Packaged: 2018-03-10 23:57:05 UTC; david
 Author: David Kepplinger [aut, cre],
-  Derek Cho [aut],
   Matias Salibian-Barrera [aut],
-  Gabriela Cohen Freue [aut]
+  Gabriela Cohen Freue [aut],
+  Derek Cho [ctb]
 Maintainer: David Kepplinger <david.kepplinger@gmail.com>
 Repository: CRAN
-Date/Publication: 2017-11-03 04:16:19 UTC
+Date/Publication: 2018-03-11 04:18:38 UTC

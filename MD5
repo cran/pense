@@ -1,6 +1,6 @@
-4109efdb9669930bc732da88c3e49af0 *DESCRIPTION
+9836d6a38ab5a6c92a8437287a1328c7 *DESCRIPTION
 1ece0def2db62d0d547aadfaf4eb100f *NAMESPACE
-50e5d55b0cda563627c960f335857ea4 *NEWS.md
+03599b226640c952a06dce912e3d7c2e *NEWS.md
 4d20b21dbc091d58f4d12fcad425e9d4 *R/additional-options.R
 ebbcaab936d126608a4348f70cc0e507 *R/build_lambda_grid.R
 83e2fcc5e44c86a8a0825d6fc2065199 *R/coef-methods.R
@@ -18,8 +18,8 @@ f7636cb9ea0eeb5ea328cd77ff6c685a *R/residuals-methods.R
 fd9ebc68d63f0747f0b22dffad988b11 *R/utilities.R
 336e6a341ba2f75894e4d050f1c828fe *README.md
 1efc7a4685e615a37186f7a1c31f5855 *cleanup
-7a83b24daf78cf4620ae22c76fb77be9 *configure
-421fe668f528e580d5b41864784ce548 *configure.ac
+a3aff7cd7e9d53941bf0296bd9a4c738 *configure
+ff9997774069e441ec7270c40695add4 *configure.ac
 e5ce541c21cd81c6e9f39a854c63cbee *configure.win
 d5c632a464bf0d1ff668f4baabb7d0f6 *inst/COPYRIGHTS
 03e93358a8577a8df336d80a4fdbded6 *man/coef.elnetfit.Rd
@@ -52,7 +52,7 @@ a7e87725feb651e38552b137e4babe8b *src/ENLars.cpp
 47d851cd9946c49d7ab35d50cedf624a *src/ElasticNet.hpp
 839e0b76be1ae8fac8ebbb06f124d706 *src/IRWEN.cpp
 e6d28c65485da9655896241ce50ac053 *src/IRWEN.hpp
-3dd8917697f3453483db71ac6d74cd69 *src/InitialEstimator.cpp
+97651e273aad5ff9f0f3624de8da530b *src/InitialEstimator.cpp
 21ff7824be2e47d71c96ae71a21cbda2 *src/InitialEstimator.hpp
 1257079562c30a81ac67db5b241f4ef2 *src/LapackException.hpp
 1b83ee9ce5c3aad64940c307e79c74c9 *src/MStep.cpp
@@ -62,15 +62,15 @@ e5794d3188bf75b54ce14136cbdd3fde *src/Makevars.win
 e463935f75023cce1cf0ca9ee7ab4b07 *src/Options.hpp
 72bd5c1bd4b683c611344c2c3d45abc5 *src/PENSEreg.cpp
 8bc6d32822a0adb226a6316574767567 *src/PENSEreg.hpp
-e2b5225711d9d80af93e0ccdd7729768 *src/PSCxx.cpp
+c8d3bd245c373b217d88608a2868f68c *src/PSCxx.cpp
 fb9f2e0ac8e9ffbb78baf4275b6a328f *src/PSCxx.hpp
 7af2401b08edc54b5fbbe6d858b6435e *src/PartialSort.c
 42c728b52c5ca88cf5e47696ec1ce5e5 *src/PartialSort.h
 39930ff8013a402c9ab7d46573504a3f *src/Rinterface.cpp
 80581e91acf9ec7197ef5f73c844b8d8 *src/Rinterface.hpp
 5045ae3e48cde1910f87c194f2aeacf3 *src/autoconfig.h.in
-ed7c3957cc671f43ea23f93727d95545 *src/autoconfig.win.h
-4b2ffdb0efa6832f59adbb6e92286386 *src/config.h
+9e44e9e92f211c6e78e5bfb21a85664a *src/autoconfig.win.h
+51ce0b9ecb6c0b3e81f6c2c1b9110481 *src/config.h
 3d9f75d39b93db324d7ee1b7e6401022 *src/mscale.c
 9f42616eab3243daf5ade2c4a2b48927 *src/mscale.h
 5774ce9be913491b852c630373a62492 *src/olsreg.c

@@ -1,8 +1,8 @@
 Package: pense
 Type: Package
 Title: Penalized Elastic Net S/MM-Estimator of Regression
-Version: 1.2.5
-Date: 2019-06-07
+Version: 1.2.9
+Date: 2020-02-07
 Authors@R: c(
     person("David", "Kepplinger", , "david.kepplinger@gmail.com",
         role = c("aut", "cre")),
@@ -26,12 +26,12 @@ LinkingTo: Rcpp, RcppArmadillo
 Suggests: testthat, lars
 License: GPL (>= 2)
 NeedsCompilation: yes
-RoxygenNote: 6.1.1
-Packaged: 2019-06-07 22:49:11 UTC; david
+RoxygenNote: 7.0.2
+Packaged: 2020-02-07 18:49:40 UTC; david
 Author: David Kepplinger [aut, cre],
   Matias Salibian-Barrera [aut],
   Gabriela Cohen Freue [aut],
   Derek Cho [ctb]
 Maintainer: David Kepplinger <david.kepplinger@gmail.com>
 Repository: CRAN
-Date/Publication: 2019-06-08 14:30:06 UTC
+Date/Publication: 2020-02-09 16:20:02 UTC

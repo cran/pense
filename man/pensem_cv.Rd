@@ -78,7 +78,8 @@ pensem_cv(x, ...)
 
 \item{...}{ignored. See the section on deprecated parameters below.}
 
-\item{y}{vector of response values of length \code{n}.}
+\item{y}{vector of response values of length \code{n}.
+For binary classification, \code{y} should be a factor with 2 levels.}
 
 \item{alpha}{elastic net penalty mixing parameter with \eqn{0 \le \alpha \le 1}. \code{alpha = 1} is the LASSO penalty,
 and \code{alpha = 0} the Ridge penalty.}
@@ -122,8 +123,12 @@ on your platform, in which case a warning is given.}
 can not be used in parallel R sessions on the same host.}
 
 \item{cv_metric}{either a string specifying the performance metric to use, or a function to evaluate prediction
-errors in a single CV replication. If a function, it is called with a single numeric vector of
-prediction errors and must return a scalar number.}
+errors in a single CV replication. If a function, the number of arguments define the data the function receives.
+If the function takes a single argument, it is called with a single numeric vector of prediction errors.
+If the function takes two or more arguments, it is called with the predicted values as first argument
+and the true values as second argument.
+The function must always return a single numeric value quantifying the prediction performance.
+The order of the given values corresponds to the order in the input data.}
 
 \item{add_zero_based}{also consider the 0-based regularization path. See details for a description.}
 
@@ -165,6 +170,16 @@ an object of cross-validated regularized M-estimates as returned from \code{\lin
 This is a convenience wrapper around \code{\link[=pense_cv]{pense_cv()}} and \code{\link[=regmest_cv]{regmest_cv()}}, for the common use-case of computing
 a highly-robust S-estimate followed by a more efficient M-estimate using the scale of the residuals from the
 S-estimate.
+}
+\details{
+The built-in CV metrics are
+\describe{
+\item{\code{"tau_size"}}{\eqn{\tau}-size of the prediction error, computed by \code{\link[=tau_size]{tau_size()}} (default).}
+\item{\code{"mape"}}{Median absolute prediction error.}
+\item{\code{"rmspe"}}{Root mean squared prediction error.}
+\item{\code{"auroc"}}{Area under the receiver operator characteristic curve (actually 1 - AUROC). Only sensible for
+binary responses.}
+}
 }
 \seealso{
 \code{\link[=pense_cv]{pense_cv()}} to compute the starting S-estimate.

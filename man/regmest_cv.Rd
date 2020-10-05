@@ -12,7 +12,7 @@ regmest_cv(
   lambda,
   cv_k,
   cv_repl = 1,
-  cv_metric = c("tau_size", "mape", "rmspe"),
+  cv_metric = c("tau_size", "mape", "rmspe", "auroc"),
   fit_all = TRUE,
   cl = NULL,
   ...
@@ -23,7 +23,8 @@ adamest_cv(x, y, alpha, alpha_preliminary = 0, exponent = 1, ...)
 \arguments{
 \item{x}{\code{n} by \code{p} matrix of numeric predictors.}
 
-\item{y}{vector of response values of length \code{n}.}
+\item{y}{vector of response values of length \code{n}.
+For binary classification, \code{y} should be a factor with 2 levels.}
 
 \item{standardize}{whether to standardize the \code{x} variables prior to fitting the PENSE estimates.
 Can also be set to \code{"cv_only"}, in which case the input data is not standardized, but the
@@ -40,8 +41,12 @@ proportion of a single value (e.g., zero-inflated data). In this case, either co
 \item{cv_repl}{number of cross-validation replications.}
 
 \item{cv_metric}{either a string specifying the performance metric to use, or a function to evaluate prediction
-errors in a single CV replication. If a function, it is called with a single numeric vector of
-prediction errors and must return a scalar number.}
+errors in a single CV replication. If a function, the number of arguments define the data the function receives.
+If the function takes a single argument, it is called with a single numeric vector of prediction errors.
+If the function takes two or more arguments, it is called with the predicted values as first argument
+and the true values as second argument.
+The function must always return a single numeric value quantifying the prediction performance.
+The order of the given values corresponds to the order in the input data.}
 
 \item{fit_all}{If \code{TRUE}, fit the model for all penalization levels. Otherwise, only at penalization
 level with smallest average CV performance.}
@@ -121,6 +126,8 @@ The built-in CV metrics are
 \item{\code{"tau_size"}}{\eqn{\tau}-size of the prediction error, computed by \code{\link[=tau_size]{tau_size()}} (default).}
 \item{\code{"mape"}}{Median absolute prediction error.}
 \item{\code{"rmspe"}}{Root mean squared prediction error.}
+\item{\code{"auroc"}}{Area under the receiver operator characteristic curve (actually 1 - AUROC). Only sensible for
+binary responses.}
 }
 
 \code{adamest_cv()} is a convenience wrapper which performs 3 steps:

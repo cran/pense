@@ -34,6 +34,7 @@
 #'
 #' @param x `n` by `p` matrix of numeric predictors.
 #' @param y vector of response values of length `n`.
+#'          For binary classification, `y` should be a factor with 2 levels.
 #' @param alpha elastic net penalty mixing parameter with \eqn{0 \le \alpha \le 1}. `alpha = 1` is the LASSO penalty,
 #'    and `alpha = 0` the Ridge penalty.
 #' @param nlambda number of penalization levels.
@@ -61,6 +62,8 @@
 #'    `standardize = FALSE` or standardize the data manually.
 #' @param intercept include an intercept in the model.
 #' @param bdp desired breakdown point of the estimator, between 0 and 0.5.
+#' @param cc tuning constant for the S-estimator. Default is to chosen based on the breakdown point \code{bdp}.
+#'   Does *not* affect the estimated coefficients, only the estimated scale of the residuals.
 #' @param eps numerical tolerance.
 #' @param explore_solutions number of solutions to compute up to the desired precision `eps`.
 #' @param explore_tol numerical tolerance for exploring possible solutions. Should be (much) looser than `eps` to
@@ -113,7 +116,7 @@
 #' @aliases adapense
 #' @importFrom lifecycle deprecated is_present deprecate_stop
 pense <- function(x, y, alpha, nlambda = 50, nlambda_enpy = 10, lambda, lambda_min_ratio, enpy_lambda,
-                  penalty_loadings, intercept = TRUE, bdp = 0.25, add_zero_based = TRUE, enpy_specific = FALSE,
+                  penalty_loadings, intercept = TRUE, bdp = 0.25, cc, add_zero_based = TRUE, enpy_specific = FALSE,
                   other_starts, eps = 1e-6, explore_solutions = 10, explore_tol = 0.1, max_solutions = 10,
                   comparison_tol = sqrt(eps), sparse = FALSE, ncores = 1, standardize = TRUE,
                   algorithm_opts = mm_algorithm_options(), mscale_opts = mscale_algorithm_options(),
@@ -149,13 +152,6 @@ pense <- function(x, y, alpha, nlambda = 50, nlambda_enpy = 10, lambda, lambda_m
 #'
 #' Perform (repeated) K-fold cross-validation for [pense()].
 #'
-#' The built-in CV metrics are
-#' \describe{
-#'   \item{`"tau_size"`}{\eqn{\tau}-size of the prediction error, computed by [tau_size()] (default).}
-#'   \item{`"mape"`}{Median absolute prediction error.}
-#'   \item{`"rmspe"`}{Root mean squared prediction error.}
-#' }
-#'
 #' @inheritParams pense
 #' @param standardize whether to standardize the `x` variables prior to fitting the PENSE estimates.
 #'    Can also be set to `"cv_only"`, in which case the input data is not standardized, but the
@@ -186,8 +182,8 @@ pense <- function(x, y, alpha, nlambda = 50, nlambda_enpy = 10, lambda, lambda_m
 #' @export
 #' @importFrom lifecycle deprecate_warn deprecated is_present
 #' @importFrom stats sd
-pense_cv <- function(x, y, standardize = TRUE, lambda, cv_k, cv_repl = 1, cv_metric = c('tau_size', 'mape', 'rmspe'),
-                     fit_all = TRUE, cl = NULL, ...) {
+pense_cv <- function(x, y, standardize = TRUE, lambda, cv_k, cv_repl = 1,
+                     cv_metric = c('tau_size', 'mape', 'rmspe', 'auroc'), fit_all = TRUE, cl = NULL, ...) {
   call <- match.call(expand.dots = TRUE)
   args <- do.call(.pense_args, as.list(call[-1L]), envir = parent.frame())
 
@@ -211,12 +207,24 @@ pense_cv <- function(x, y, standardize = TRUE, lambda, cv_k, cv_repl = 1, cv_met
     }
   }
 
-  cv_metric <- if (is.character(cv_metric)) {
+  cv_metric <- if (is.null(call$cv_metric) && args$binary_response) {
+    cv_measure_str <- 'auroc'
+    .cv_auroc
+  } else if (is.character(cv_metric)) {
     cv_measure_str <- match.arg(cv_metric)
-    switch(cv_measure_str, mape = .cv_mape, rmspe = .cv_rmspe, tau_size = tau_size)
+    switch(cv_measure_str, mape = .cv_mape, rmspe = .cv_rmspe, tau_size = tau_size,
+           auroc = if (args$binary_response) {
+             .cv_auroc
+           } else {
+             abort("cv_metric=\"auroc\" is only valid for binary responses.")
+           })
   } else {
     cv_measure_str <- 'user_fun'
     match.fun(cv_metric)
+  }
+
+  if (is.null(formals(cv_metric))) {
+    abort("Function `cv_metric` must accept at least 1 argument.")
   }
 
   cv_fun <- function (train_data, test_ind) {
@@ -386,7 +394,8 @@ adapense_cv <- function (x, y, alpha, alpha_preliminary = 0, exponent = 1, ...) 
 #' @importFrom methods is
 #' @importFrom stats runif
 .pense_args <- function (x, y, alpha, nlambda = 50, nlambda_enpy = 10, lambda, lambda_min_ratio, enpy_lambda,
-                         penalty_loadings, intercept = TRUE, bdp = 0.25, add_zero_based = TRUE, enpy_specific = FALSE,
+                         penalty_loadings, intercept = TRUE, bdp = 0.25, cc = NULL, add_zero_based = TRUE,
+                         enpy_specific = FALSE,
                          other_starts, eps = 1e-6, explore_solutions = 10, explore_tol = 0.1, max_solutions = 10,
                          comparison_tol = sqrt(eps), sparse = FALSE, ncores = 1, standardize = TRUE,
                          algorithm_opts = mm_algorithm_options(), mscale_opts = mscale_algorithm_options(),
@@ -465,7 +474,8 @@ adapense_cv <- function (x, y, alpha, alpha_preliminary = 0, exponent = 1, ...) 
   }
 
   ## Process input arguments
-  y <- .as(y, 'numeric')
+  response <- .validate_response(y)
+  y <- response$values
   x_dim <- dim(x)
 
   if (length(y) != x_dim[[1L]]) {
@@ -500,7 +510,7 @@ adapense_cv <- function (x, y, alpha, alpha_preliminary = 0, exponent = 1, ...) 
                      max_optima = .as(max_solutions[[1L]], 'integer'),
                      num_threads = max(1L, .as(ncores[[1L]], 'integer')),
                      sparse = isTRUE(sparse),
-                     mscale = .full_mscale_algo_options(bdp = bdp, mscale_opts = mscale_opts))
+                     mscale = .full_mscale_algo_options(bdp = bdp, cc = cc, mscale_opts = mscale_opts))
 
   if (pense_opts$explore_tol < pense_opts$eps) {
     abort("`explore_tol` must not be less than `eps`")
@@ -643,7 +653,7 @@ adapense_cv <- function (x, y, alpha, alpha_preliminary = 0, exponent = 1, ...) 
     abort("All values in `lambda` must be positive.")
   }
 
-  return(list(std_data = std_data, alpha = alpha, lambda = lambda, enpy_lambda_inds = enpy_lambda_inds,
-              penalty_loadings = penalty_loadings, pense_opts = pense_opts, enpy_opts = enpy_opts,
-              optional_args = optional_args, restore_coef_length = restore_coef_length))
+  return(list(std_data = std_data, binary_response = response$binary, alpha = alpha, lambda = lambda,
+              enpy_lambda_inds = enpy_lambda_inds, penalty_loadings = penalty_loadings, pense_opts = pense_opts,
+              enpy_opts = enpy_opts, optional_args = optional_args, restore_coef_length = restore_coef_length))
 }

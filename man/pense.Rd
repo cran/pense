@@ -17,6 +17,7 @@ pense(
   penalty_loadings,
   intercept = TRUE,
   bdp = 0.25,
+  cc,
   add_zero_based = TRUE,
   enpy_specific = FALSE,
   other_starts,
@@ -39,7 +40,8 @@ pense(
 \arguments{
 \item{x}{\code{n} by \code{p} matrix of numeric predictors.}
 
-\item{y}{vector of response values of length \code{n}.}
+\item{y}{vector of response values of length \code{n}.
+For binary classification, \code{y} should be a factor with 2 levels.}
 
 \item{alpha}{elastic net penalty mixing parameter with \eqn{0 \le \alpha \le 1}. \code{alpha = 1} is the LASSO penalty,
 and \code{alpha = 0} the Ridge penalty.}
@@ -65,6 +67,9 @@ coefficient. Only allowed for \code{alpha} > 0.}
 \item{intercept}{include an intercept in the model.}
 
 \item{bdp}{desired breakdown point of the estimator, between 0 and 0.5.}
+
+\item{cc}{tuning constant for the S-estimator. Default is to chosen based on the breakdown point \code{bdp}.
+Does \emph{not} affect the estimated coefficients, only the estimated scale of the residuals.}
 
 \item{add_zero_based}{also consider the 0-based regularization path. See details for a description.}
 

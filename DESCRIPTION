@@ -1,8 +1,8 @@
 Package: pense
 Type: Package
 Title: Penalized Elastic Net S/MM-Estimator of Regression
-Version: 2.0.2
-Date: 2020-10-03
+Version: 2.0.3
+Date: 2021-04-12
 Authors@R: c(
     person("David", "Kepplinger", , "david.kepplinger@gmail.com",
         role = c("aut", "cre")),
@@ -14,7 +14,7 @@ Copyright: See the file COPYRIGHT for copyright details on some of the
 Encoding: UTF-8
 Biarch: true
 SystemRequirements: C++11
-URL: https://dakep.github.io/pense-rpkg,
+URL: https://dakep.github.io/pense-rpkg/,
         https://github.com/dakep/pense-rpkg
 BugReports: https://github.com/dakep/pense-rpkg/issues
 Description: Robust penalized (adaptive) elastic net S and M estimators for
@@ -33,10 +33,10 @@ NeedsCompilation: yes
 RoxygenNote: 7.1.1
 RdMacros: lifecycle
 VignetteBuilder: knitr
-Packaged: 2020-10-04 00:52:33 UTC; david
+Packaged: 2021-04-14 14:01:02 UTC; david
 Author: David Kepplinger [aut, cre],
   Matías Salibián-Barrera [aut],
   Gabriela Cohen Freue [aut]
 Maintainer: David Kepplinger <david.kepplinger@gmail.com>
 Repository: CRAN
-Date/Publication: 2020-10-05 08:40:05 UTC
+Date/Publication: 2021-04-14 14:40:08 UTC

@@ -53,8 +53,8 @@ summary.pense_cvfit <- function (object, lambda = c('min', 'se'), se_mult = 1, .
   }
 
   cat(sprintf("Hyper-parameters: lambda=%s", format(lambda)))
-  if (!is.null(object$call$alpha)) {
-    cat(sprintf(", alpha=%s", format(object$call$alpha)))
+  if (!is.null(object$alpha)) {
+    cat(sprintf(", alpha=%s", format(object$alpha)))
   }
   if (!is.null(object$exponent)) {
     cat(sprintf(", exponent=%s", format(object$exponent)))
@@ -118,9 +118,10 @@ prediction_performance <- function (..., lambda = c('min', 'se'), se_mult = 1) {
     object_names[object_names == ''] <- object_fallback_names[object_names == '']
   }
   names(objects) <- object_names
+  eval_frame <- parent.frame()
 
   pred_perf <- do.call(rbind, lapply(object_names, function (on) {
-    object <- eval.parent(objects[[on]], n = 2)
+    object <- eval(objects[[on]], eval_frame)
     if (!is(object, 'pense_cvfit')) {
       abort(sprintf("`%s` must be a cross-validated PENSE fit.", on))
     }
@@ -142,7 +143,7 @@ prediction_performance <- function (..., lambda = c('min', 'se'), se_mult = 1) {
       sum(abs(object$estimates[[se_selection]]$beta) > .Machine$double.eps)
     }
     cvres$name <- on
-    cvres$alpha <- if (!is.null(object$call$alpha)) { object$call$alpha } else { NA_real_ }
+    cvres$alpha <- if (!is.null(object$alpha)) { object$alpha } else { NA_real_ }
     cvres$exponent <- if (!is.null(object$exponent)) { object$exponent } else { NA_real_ }
 
     return(cvres)

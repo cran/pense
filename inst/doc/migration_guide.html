@@ -12,7 +12,7 @@
 
 <meta name="author" content="David Kepplinger" />
 
-<meta name="date" content="2021-04-14" />
+<meta name="date" content="2021-07-07" />
 
 <title>Migrating from pense version 1.x to 2.x</title>
 
@@ -163,7 +163,7 @@ div.csl-indent {
 
 <h1 class="title toc-ignore">Migrating from pense version 1.x to 2.x</h1>
 <h4 class="author">David Kepplinger</h4>
-<h4 class="date">2021-04-14</h4>
+<h4 class="date">2021-07-07</h4>
 
 
 
@@ -172,7 +172,7 @@ div.csl-indent {
 <p>First we need to load the new version of the pense package:</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(pense)</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">packageVersion</span>(<span class="st">&quot;pense&quot;</span>)</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] &#39;2.0.3&#39;</span></span></code></pre></div>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] &#39;2.1.0&#39;</span></span></code></pre></div>
 <p>This guide uses the following simulated data:</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">1234</span>)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rt</span>(<span class="dv">50</span> <span class="sc">*</span> <span class="dv">10</span>, <span class="at">df =</span> <span class="dv">5</span>), <span class="at">ncol =</span> <span class="dv">10</span>)</span>
@@ -188,32 +188,35 @@ div.csl-indent {
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">1234</span>)</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>fitted_with_cv <span class="ot">&lt;-</span> <span class="fu">pense_cv</span>(x, y, <span class="at">alpha =</span> <span class="fl">0.6</span>, <span class="at">nlambda =</span> <span class="dv">40</span>, <span class="at">warm_reset =</span> 5L, <span class="at">cv_k =</span> <span class="dv">5</span>)</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Warning: The `warm_reset` argument of `pense()` is deprecated as of pense 2.0.0.</span></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Please use the `nlambda_enpy` argument instead.</span></span></code></pre></div>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Please use the `nlambda_enpy` argument instead.</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Warning: To use `fit_all = &quot;se&quot;`, `cv_repl` must be 2 or greater.</span></span></code></pre></div>
 <p>However, this raises a warning that the argument <code>warm_reset=</code> is also deprecated in favor of argument <code>nlambda_enpy=</code>. The new version uses more consistent and self-explaining naming for arguments. Therefore, the most basic way for computing regularized S-estimates of linear regression <em>and</em> estimating their prediction performance via CV is the following:</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">1234</span>)</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>fitted_with_cv <span class="ot">&lt;-</span> <span class="fu">pense_cv</span>(x, y, <span class="at">alpha =</span> <span class="fl">0.6</span>, <span class="at">nlambda =</span> <span class="dv">40</span>, <span class="at">nlambda_enpy =</span> 5L, <span class="at">cv_k =</span> <span class="dv">5</span>)</span></code></pre></div>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>fitted_with_cv <span class="ot">&lt;-</span> <span class="fu">pense_cv</span>(x, y, <span class="at">alpha =</span> <span class="fl">0.6</span>, <span class="at">nlambda =</span> <span class="dv">40</span>, <span class="at">nlambda_enpy =</span> 5L, <span class="at">cv_k =</span> <span class="dv">5</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Warning: To use `fit_all = &quot;se&quot;`, `cv_repl` must be 2 or greater.</span></span></code></pre></div>
 <p>To only fit the models, without estimating prediction performance, use <code>pense()</code> (note the absence of the <code>cv_k=</code> argument):</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>fitted_no_cv <span class="ot">&lt;-</span> <span class="fu">pense</span>(x, y, <span class="at">alpha =</span> <span class="fl">0.6</span>, <span class="at">nlambda =</span> <span class="dv">40</span>, <span class="at">nlambda_enpy =</span> 5L)</span></code></pre></div>
 <div id="structure-of-returned-objects" class="section level2">
 <h2>Structure of returned objects</h2>
 <p>The structure of the returned objects is different from pense versions 1.x. In old versions, the estimated coefficients were stored as a sparse matrix object, with one column per fit (i.e., per penalization level). In new versions, estimates are stored as a list with one entry per penalization level. For fitted models with prediction performance, as in <code>fitted_with_cv</code>, the returned object additionally contains information on the prediction performance of all fitted models:</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">str</span>(fitted_no_cv, <span class="at">max.level =</span> <span class="dv">1</span>)</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; List of 4</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ estimates:List of 40</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ call     : language pense(x = x, y = y, alpha = 0.6, nlambda = 40, nlambda_enpy = 5L)</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ alpha    : num 0.6</span></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ lambda   : num [1:40] 3.82 3.16 2.61 2.16 1.78 ...</span></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  - attr(*, &quot;class&quot;)= chr [1:2] &quot;pense&quot; &quot;pense_fit&quot;</span></span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="fu">str</span>(fitted_with_cv, <span class="at">max.level =</span> <span class="dv">1</span>)</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; List of 7</span></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ call           : language pense_cv(x = x, y = y, cv_k = 5, alpha = 0.6, nlambda = 40, nlambda_enpy = 5L)</span></span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ lambda         : num [1:40] 3.82 3.16 2.61 2.16 1.78 ...</span></span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ alpha          : num 0.6</span></span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ cvres          :&#39;data.frame&#39;: 40 obs. of  3 variables:</span></span>
-<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ cv_replications: num [1:40, 1] 2.96 2.9 2.79 2.67 2.5 ...</span></span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ cv_measure     : chr &quot;tau_size&quot;</span></span>
-<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ estimates      :List of 40</span></span>
-<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  - attr(*, &quot;class&quot;)= chr [1:2] &quot;pense&quot; &quot;pense_cvfit&quot;</span></span></code></pre></div>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; List of 5</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ call     : language pense(x = x, y = y, alpha = 0.6, nlambda = 40, nlambda_enpy = 5L)</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ bdp      : num 0.255</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ lambda   :List of 1</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ estimates:List of 40</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ alpha    : num 0.6</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  - attr(*, &quot;class&quot;)= chr [1:2] &quot;pense&quot; &quot;pense_fit&quot;</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="fu">str</span>(fitted_with_cv, <span class="at">max.level =</span> <span class="dv">1</span>)</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; List of 7</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ call      : language pense_cv(x = x, y = y, cv_k = 5, alpha = 0.6, nlambda = 40, nlambda_enpy = 5L)</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ bdp       : num 0.255</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ lambda    :List of 1</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ alpha     : num 0.6</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ cvres     :&#39;data.frame&#39;:  40 obs. of  4 variables:</span></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ cv_measure: chr &quot;tau_size&quot;</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  $ estimates :List of 1</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  - attr(*, &quot;class&quot;)= chr [1:2] &quot;pense&quot; &quot;pense_cvfit&quot;</span></span></code></pre></div>
 </div>
 </div>
 <div id="extracting-coefficient-estimates" class="section level1">
@@ -221,15 +224,12 @@ div.csl-indent {
 <p>As in previous versions, the coefficient estimates are best accessed via the <code>coefficients()</code> method. For fits with estimated prediction performance, the method returns the coefficients of the model yielding the lowest prediction error:</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">coefficients</span>(fitted_with_cv)</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; (Intercept)          X1          X2          X3          X4          X5 </span></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  0.10172752  0.52970226 -1.70085495  1.40631808 -0.09281353  0.14095462 </span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  0.14269066  0.50133063 -1.63047323  1.36756054 -0.07072134  0.14133158 </span></span>
 <span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;          X6          X7          X8          X9         X10 </span></span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  0.06652198 -0.03318776  0.00000000  0.19113248  0.05875205</span></span></code></pre></div>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  0.09419159 -0.01291331  0.00000000  0.17531995  0.03509110</span></span></code></pre></div>
 <p>Fits computed with <code>pense()</code>, however, do not have information about prediction performance, hence <code>coefficients(fitted_no_cv)</code> would not know what penalization level to use. In this case, the desired penalization level must be specified manually:</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">coefficients</span>(fitted_no_cv, <span class="at">lambda =</span> fitted_no_cv<span class="sc">$</span>lambda[<span class="dv">10</span>])</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; (Intercept)          X1          X2          X3          X4          X5 </span></span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   0.3406859   0.2959405  -1.0300811   1.0751673   0.0000000   0.0000000 </span></span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;          X6          X7          X8          X9         X10 </span></span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;   0.2256299   0.0000000   0.0000000   0.0000000   0.0000000</span></span></code></pre></div>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Error in lambda[[1L]]: subscript out of bounds</span></span></code></pre></div>
 <p>An important difference to previous versions is that new versions <strong>do not correct for the bias</strong> introduced by the Ridge penalty. The correction, which was adopted from the original LS elastic net paper <span class="citation">(Zou and Hastie 2005)</span>, was dropped as it does not adequately counter the effects of the Ridge penalty on the S-estimates. Specifying the <code>correction=</code> argument results in an error in new versions of the package:</p>
 <div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">coefficients</span>(fitted_with_cv, <span class="at">correction =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Error: The `correction` argument of `coef()` was deprecated in pense 2.0.0 and is now defunct.</span></span></code></pre></div>

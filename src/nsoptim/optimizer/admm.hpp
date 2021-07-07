@@ -83,7 +83,7 @@ inline bool AnyViolateKKT(const arma::mat& x, const arma::vec& residuals, const 
   // const double lambda_1 = residuals.n_elem * penalty.alpha() * penalty.lambda();
   const double lambda_1 = penalty.alpha() * lambda * residuals.n_elem;
   for (arma::uword j = 0; j < x.n_cols; ++j) {
-        // const double cutoff = lambda1 * penalty.loadings()[j];
+    // const double cutoff = lambda1 * penalty.loadings()[j];
     const double inner = arma::dot(x.col(j), residuals);
     if ((inner < -lambda_1) || (inner > lambda_1)) {
       return true;
@@ -359,35 +359,12 @@ class GenericLinearizedAdmmOptimizer : public Optimizer<typename ProxOp::LossFun
 
   //! Initialize the ADMM optimizer without setting a loss or penalty function.
   //!
-  //! @param prox_arg_1 first argument to constructor of the proximal operator.
-  //! @param prox_args... further arguments to the constructor of the proximal operator.
-  template<typename T, typename... Args, typename = typename
-           std::enable_if<!IsConfiguration<T>::value && !IsLossFunction<T>::value, void>::type >
-  explicit GenericLinearizedAdmmOptimizer(T&& prox_arg_1, Args&&... prox_args) noexcept
-      : config_(admm_optimizer::kDefaultLinConfig),
-        prox_(std::forward<T>(prox_arg_1), std::forward<Args>(prox_args)...),
-        loss_(nullptr), penalty_(nullptr) {}
-
-  //! Initialize the ADMM optimizer without setting a loss or penalty function.
-  //!
   //! @param config ADMM configuration object.
   //! @param prox_args... arguments to the constructor of the proximal operator.
   template<typename C, typename... Args, typename = typename
            std::enable_if<IsConfiguration<C>::value, void>::type >
   explicit GenericLinearizedAdmmOptimizer(const C& config, Args&&... prox_args) noexcept
       : config_(config), prox_(std::forward<Args>(prox_args)...), loss_(nullptr), penalty_(nullptr) {}
-
-  //! Initialize the ADMM optimizer without setting a loss or penalty function.
-  //!
-  //! @param prox_arg_1 first argument to constructor of the proximal operator.
-  //! @param prox_arg_2 second argument to constructor of the proximal operator.
-  //! @param prox_args... further arguments to the constructor of the proximal operator.
-  template<typename T1, typename T2, typename... Args, typename = typename
-           std::enable_if<!IsConfiguration<T1>::value && !IsLossFunction<T1>::value, void>::type >
-  GenericLinearizedAdmmOptimizer(T1&& prox_arg_1, T2&& prox_arg_2, Args&&... prox_args) noexcept
-      : config_(admm_optimizer::kDefaultLinConfig),
-        prox_(std::forward<T1>(prox_arg_1), std::forward<T2>(prox_arg_2), std::forward<Args>(prox_args)...),
-        loss_(nullptr), penalty_(nullptr) {}
 
   //! Initialize the ADMM optimizer without setting a loss or penalty function.
   //!
@@ -576,15 +553,14 @@ class GenericLinearizedAdmmOptimizer : public Optimizer<typename ProxOp::LossFun
       coefs_.intercept = 0;
     }
 
-    std::unique_ptr<Metrics> metrics(new Metrics("admm"));
+    auto metrics = std::make_unique<Metrics>("admm");
     metrics->AddDetail("type", "linearized");
 
     operator_scaling_f_ = prox_.OperatorScaling();  // this is (1/beta) in Deng & Yin (2016)
     const double scaled_lambda = penalty_->lambda() * prox_.PenaltyScaling();
 
     const auto en_cutoff = DetermineCutoff(scaled_lambda, IsAdaptiveTag{});
-    const double en_multiplier = 1 / (1 + scaled_lambda * (1 - penalty_->alpha()) *
-                                      operator_scaling_g_ * operator_scaling_f_);
+    const auto en_multiplier = DetermineEnMultiplier(scaled_lambda, IsAdaptiveTag{});
 
     double gap = 0;
 
@@ -619,13 +595,13 @@ class GenericLinearizedAdmmOptimizer : public Optimizer<typename ProxOp::LossFun
           arma::dot(coefs_.beta, x_col_sum_) - arma::accu(state_.fitted - state_.lagrangian * operator_scaling_f_));
 
         // remember: fitted_step_1 is already fitted_step_1 - state_.fitted
-        coefs_.beta = en_multiplier * SoftThreshold(coefs_.beta, -operator_scaling_g_,
+        coefs_.beta = UpdateSlope(en_multiplier, SoftThreshold(coefs_.beta, -operator_scaling_g_,
           intercept * x_col_sum_ + data.cx().t() * (fitted_step_1 + operator_scaling_f_ * state_.lagrangian),
-          en_cutoff);
+          en_cutoff));
       } else {
         // remember: fitted_step_1 is already fitted_step_1 - state_.fitted
-        coefs_.beta = en_multiplier * SoftThreshold(coefs_.beta, -operator_scaling_g_,
-          data.cx().t() * (fitted_step_1 + operator_scaling_f_ * state_.lagrangian), en_cutoff);
+        coefs_.beta = UpdateSlope(en_multiplier, SoftThreshold(coefs_.beta, -operator_scaling_g_,
+          data.cx().t() * (fitted_step_1 + operator_scaling_f_ * state_.lagrangian), en_cutoff));
       }
 
       fitted_step_1 = data.cx() * coefs_.beta;
@@ -647,26 +623,27 @@ class GenericLinearizedAdmmOptimizer : public Optimizer<typename ProxOp::LossFun
       iter_metrics.AddDetail("gap", gap);
 
       if (gap < convergence_tolerance_) {
-        return FinalizeResult(iter, gap, OptimumStatus::kOk, std::move(metrics));
+        return FinalizeResult(iter, gap, state_.fitted, OptimumStatus::kOk, std::move(metrics));
       }
     }
-    return FinalizeResult(--iter, gap, OptimumStatus::kWarning, "ADMM-algorithm did not converge.", std::move(metrics));
+    return FinalizeResult(--iter, gap, state_.fitted,
+                          OptimumStatus::kWarning, "ADMM-algorithm did not converge.", std::move(metrics));
   }
 
  private:
-  Optimum FinalizeResult(const int iter, const double gap, const OptimumStatus status,
+  Optimum FinalizeResult(const int iter, const double gap, const arma::vec& fitted, const OptimumStatus status,
                          std::unique_ptr<Metrics> metrics) {
     // Update the active set.
     metrics->AddMetric("iter", iter);
     metrics->AddMetric("gap", gap);
-    return MakeOptimum(*loss_, *penalty_, coefs_, std::move(metrics), status);
+    return MakeOptimum(*loss_, *penalty_, coefs_, loss_->data().cy() - fitted, std::move(metrics), status);
   }
 
-  Optimum FinalizeResult(const int iter, const double gap, const OptimumStatus status, const std::string& message,
-                         std::unique_ptr<Metrics> metrics) {
+  Optimum FinalizeResult(const int iter, const double gap, const arma::vec& fitted, const OptimumStatus status,
+                         const std::string& message, std::unique_ptr<Metrics> metrics) {
     metrics->AddMetric("iter", iter);
     metrics->AddMetric("gap", gap);
-    return MakeOptimum(*loss_, *penalty_, coefs_, std::move(metrics), status, message);
+    return MakeOptimum(*loss_, *penalty_, coefs_, loss_->data().cy() - fitted, std::move(metrics), status, message);
   }
 
   //! Determine the cutoff for the soft-threshold function for adaptive penalties
@@ -680,6 +657,35 @@ class GenericLinearizedAdmmOptimizer : public Optimizer<typename ProxOp::LossFun
   //! @param scaled_lambda scaled adaptive EN penalty parameter
   double DetermineCutoff(const double scaled_lambda, std::false_type) const noexcept {
     return penalty_->alpha() * scaled_lambda * operator_scaling_g_ * operator_scaling_f_;
+  }
+
+  //! Determine the EN multiplier for adaptive penalties
+  //!
+  arma::vec DetermineEnMultiplier(const double scaled_lambda, std::true_type /* is_adaptive */) const noexcept {
+    return 1 / (1 + penalty_->loadings() * scaled_lambda * (1 - penalty_->alpha()) *
+      operator_scaling_g_ * operator_scaling_f_);
+  }
+
+  //! Determine the EN multiplier for non-adaptive penalties
+  //!
+  //! @param scaled_lambda scaled adaptive EN penalty parameter
+  double DetermineEnMultiplier(const double scaled_lambda, std::false_type) const noexcept {
+    return 1 / (1 + scaled_lambda * (1 - penalty_->alpha()) * operator_scaling_g_ * operator_scaling_f_);
+  }
+
+  //! Update the slope coefficients for adaptive penalties
+  //!
+  template<typename T>
+  T UpdateSlope(const arma::vec& en_mult, const T& soft_thresh) const noexcept {
+    return en_mult % soft_thresh;
+  }
+
+  //! Update the slope coefficients for non-adaptive penalties
+  //!
+  //! @param scaled_lambda scaled adaptive EN penalty parameter
+  template<typename T>
+  T UpdateSlope(const double en_mult, const T& soft_thresh) const noexcept {
+    return en_mult * soft_thresh;
   }
 
   const AdmmLinearConfiguration config_;
@@ -871,7 +877,7 @@ class AdmmVarStepOptimizer : public Optimizer<LossFunction, PenaltyFunction, Coe
     const double scaled_lambda = ScaledLambda(IsWeightedTag{});
     const bool check_empty = admm_optimizer::AllZero(coefs_.beta) || (coefs_.beta.n_elem != data_->n_pred());
 
-    std::unique_ptr<Metrics> metrics(new Metrics("admm"));
+    auto metrics = std::make_unique<Metrics>("admm");
     metrics->AddDetail("type", "var-stepsize");
 
     // Check if the coefficients are correct.
@@ -979,7 +985,8 @@ class AdmmVarStepOptimizer : public Optimizer<LossFunction, PenaltyFunction, Coe
   }
 
  private:
-  Optimum FinalizeResult(const int iter, const OptimumStatus status, std::unique_ptr<Metrics> metrics) {
+  Optimum FinalizeResult(const int iter, const OptimumStatus status,
+                         std::unique_ptr<Metrics> metrics) {
     metrics->AddMetric("iter", iter);
     metrics->AddMetric("gap", state_.gap);
     metrics->AddDetail("tau-end", state_.tau);
@@ -987,8 +994,8 @@ class AdmmVarStepOptimizer : public Optimizer<LossFunction, PenaltyFunction, Coe
     return MakeOptimum(*loss_, *penalty_, coefs_, std::move(metrics), status);
   }
 
-  Optimum FinalizeResult(const int iter, const OptimumStatus status, const std::string& message,
-                         std::unique_ptr<Metrics> metrics) {
+  Optimum FinalizeResult(const int iter, const OptimumStatus status,
+                         const std::string& message, std::unique_ptr<Metrics> metrics) {
     metrics->AddMetric("iter", iter);
     metrics->AddMetric("gap", state_.gap);
     metrics->AddDetail("tau-end", state_.tau);

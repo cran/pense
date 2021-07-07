@@ -104,7 +104,7 @@ inline arma::uword SolveIterative(const arma::mat& A, const arma::vec& b, const 
     const double step_size = resid_norm * resid_norm / arma::dot(step_dir, trans_step_dir);
     (*x) += step_size * step_dir;
     if (it % 4 == 0) {
-      // at every 4th step, re-compute the residuals to avoid numerical issues
+      // at every 4th step, re-compute the residuals to avoid drift
       resid = b - A * (*x);
     } else {
       resid -= step_size * trans_step_dir;
@@ -160,6 +160,12 @@ class Cholesky {
     return *this;
   }
 
+  //! Default move constructor.
+  Cholesky(Cholesky&& other) = default;
+
+  //! Default move assignment operator.
+  Cholesky& operator=(Cholesky&& other) = default;
+
   //! Update the diagonal of the matrix and reset the decomposition.
   //!
   //! @param add value to add to the diagonal of the matrix.
@@ -182,12 +188,6 @@ class Cholesky {
     active_size_ = 0;
   }
 
-  //! Default move constructor.
-  Cholesky(Cholesky&& other) = default;
-
-  //! Default move assignment operator.
-  Cholesky& operator=(Cholesky&& other) = default;
-
   //! Add a row/column of the matrix to the Cholesky decomposition.
   //!
   //! The row/column is added at the end.
@@ -195,8 +195,8 @@ class Cholesky {
   //! for the permutated matrix *A_[(3, 1), (3, 1)]*!
   //!
   //! @param col the column index in the interval ``[0, matrix.n_cols) ``.
-  //! @return ``true`` if the column was added, ``false`` if the column was not added because it would make the
-  //!         matrix singular and the Cholesky decomposition ill-defined.
+  //! @return ``true`` if the column was added, ``false`` if the column was not added because either it would make the
+  //!         matrix singular and the Cholesky decomposition ill-defined or the gram matrix is at it's maximal size.
   bool Add(const arma::uword add) noexcept {
     const double sq_norm_new_x = gram_(add, add);
     const double norm_new_x = std::sqrt(sq_norm_new_x);
@@ -204,6 +204,8 @@ class Cholesky {
     if (active_size_ == 0) {
       // No active variables yet and the decomposition is empty.
       gram_decomp_packed_[0] = norm_new_x;
+    } else if (active_size_ >= max_active_) {
+      return false;
     } else {
       char upper = 'U';
       char trans_y = 'T';
@@ -216,6 +218,7 @@ class Cholesky {
       arma::vec l(next_column, active_size_, false, true);
       l = gram_.unsafe_col(add).elem(active_cols_.head(active_size_));
 
+      // Solve the triangular system of linear equations
       dtpsv(&upper, &trans_y, &diag_n, &mat_size, gram_decomp_packed_.get(), l.memptr(), &incx);
 
       next_column += active_size_;  //< Now points to the diagonal element of this column.
@@ -341,6 +344,78 @@ class Cholesky {
   arma::uvec active_cols_;
   std::unique_ptr<double[]> gram_decomp_packed_;
 };
+
+//! Define a proxy to compute elementwise products in-place for "any" type of left-hand-side and
+//! a vector-type right-hand-side.
+//! @param lhs the left-hand-side
+//! @param rhs the right-hand-side vector
+template <typename T>
+void InplaceElementwiseProduct(const arma::vec& rhs, T* lhs) {
+  *lhs %= rhs;
+}
+
+//! Define a proxy to compute elementwise products in-place for "any" type of left-hand-side and
+//! a vector-type right-hand-side.
+//! @param lhs the left-hand-side
+//! @param rhs the right-hand-side vector
+template <typename T>
+void InplaceElementwiseProduct(const double rhs, T* lhs) {
+  *lhs *= rhs;
+}
+
+//! Define a proxy to compute elementwise products for "any" type of left-hand-side and
+//! a vector-type right-hand-side.
+//! @param lhs the left-hand-side
+//! @param rhs the right-hand-side vector
+template <typename T>
+inline auto ElementwiseProduct(const T& lhs, const arma::vec& rhs) {
+  return lhs % rhs;
+}
+
+//! Define a proxy to compute elementwise products for "any" type of left-hand-side and
+//! a vector-type right-hand-side.
+//! @param lhs the left-hand-side
+//! @param rhs the right-hand-side vector
+template <typename T>
+inline auto ElementwiseProduct(const T& lhs, const arma::sp_vec& rhs) {
+  return lhs % rhs;
+}
+
+//! Define a proxy to compute elementwise products for "any" type of left-hand-side and
+//! a vector-type right-hand-side.
+//! @param lhs the left-hand-side
+//! @param rhs the right-hand-side vector
+template <typename T>
+inline auto ElementwiseProduct(const T& lhs, const double& rhs) {
+  return lhs * rhs;
+}
+
+//! Define a proxy to compute elementwise products for "any" type of left-hand-side and
+//! a vector-type right-hand-side.
+//! @param lhs the left-hand-side
+//! @param rhs the right-hand-side vector
+template<>
+inline auto ElementwiseProduct<double>(const double& scalar, const arma::vec& rhs) {
+  return scalar * rhs;
+}
+
+//! Define a proxy to compute elementwise products for "any" type of left-hand-side and
+//! a vector-type right-hand-side.
+//! @param lhs the left-hand-side
+//! @param rhs the right-hand-side vector
+template<>
+inline auto ElementwiseProduct<double>(const double& scalar, const arma::sp_vec& rhs) {
+  return scalar * rhs;
+}
+
+//! Define a proxy to compute elementwise products for "any" type of left-hand-side and
+//! a vector-type right-hand-side.
+//! @param lhs the left-hand-side
+//! @param rhs the right-hand-side vector
+template<>
+inline auto ElementwiseProduct<double>(const double& scalar, const double& rhs) {
+  return scalar * rhs;
+}
 }  // namespace linalg
 }  // namespace nsoptim
 

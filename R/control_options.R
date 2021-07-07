@@ -63,7 +63,11 @@ mscale_algorithm_options <- function (max_it = 200, eps = 1e-8) {
     stop("`bdp` is outside of 0 and 0.5")
   }
 
-  mscale_opts$cc <- if (is.null(cc)) { .bisquare_consistency_const(mscale_opts$delta) } else { .as(cc, 'numeric') }
+  mscale_opts$cc <- if (is.null(cc)) {
+    .bisquare_consistency_const(mscale_opts$delta)
+  } else {
+    .as(cc, 'numeric')
+  }
   return(mscale_opts)
 }
 
@@ -80,7 +84,7 @@ mscale_algorithm_options <- function (max_it = 200, eps = 1e-8) {
 #' @return options for the MM algorithm.
 #' @export
 mm_algorithm_options <- function (max_it = 500, tightening = c('adaptive', 'exponential', 'none'),
-                                  tightening_steps = 10, en_algorithm_opts) {
+                                  tightening_steps = 2, en_algorithm_opts) {
   list(algorithm = 'mm', max_it = .as(max_it[[1L]], 'integer'),
        tightening = .tightening_id(match.arg(tightening)),
        tightening_steps = .as(tightening_steps[[1L]], 'integer'),
@@ -217,22 +221,26 @@ en_ridge_options <- function () {
 .select_en_algorithm <- function (en_options, alpha, sparse, eps) {
   if (!is.null(en_options)) {
     # Check if the EN algorithm can handle the given `alpha`
-    if (identical(en_options$algorithm, 'dal') && !isTRUE(alpha > 0)) {
-      warn("The DAL algorithm can not handle a Ridge penalty. Using default algorithm as fallback.")
+    if (identical(en_options$algorithm, 'dal') && !all(alpha > 0)) {
+      warn(paste("The DAL algorithm can not handle an EN penalty with alpha=0.",
+                 "Using default algorithm as fallback."))
       en_options <- NULL
-    } else if (identical(en_options$algorithm, 'augridge') && !isTRUE(alpha < .Machine$double.eps)) {
-      warn("The Ridge algorithm can only handle a Ridge penalty. Using default algorithm as fallback.")
+    } else if (identical(en_options$algorithm, 'augridge') && !all(alpha < .Machine$double.eps)) {
+      warn(paste("The Ridge algorithm can only handle a Ridge penalty.",
+                 "Using default algorithm as fallback."))
       en_options <- NULL
-    } else if (identical(en_options$algorithm, 'lars') && isTRUE(alpha < .Machine$double.eps)) {
+    } else if (identical(en_options$algorithm, 'lars') && all(alpha < .Machine$double.eps)) {
       en_options <- en_ridge_options()
     }
   }
 
   if (is.null(en_options)) {
-    en_options <- if (alpha > 0) {
+    en_options <- if (all(alpha > 0)) {
       en_lars_options()
-    } else {
+    } else if (all(alpha < .Machine$double.eps)) {
       en_ridge_options()
+    } else {
+      abort("Cannot compute PENSE for alpha=0 and alpha > 0 simultaneously.")
     }
   }
 

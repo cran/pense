@@ -4,20 +4,25 @@
 \alias{plot.pense_cvfit}
 \title{Plot Method for Penalized Estimates With Cross-Validation}
 \usage{
-\method{plot}{pense_cvfit}(x, what = c("cv", "coef.path"), se_mult = 1, ...)
+\method{plot}{pense_cvfit}(x, what = c("cv", "coef.path"), alpha = NULL, se_mult = 1, ...)
 }
 \arguments{
 \item{x}{fitted estimates with cross-validation information.}
 
 \item{what}{plot either the CV performance or the coefficient path.}
 
+\item{alpha}{If \code{what = "cv"}, only CV performance for fits with matching \code{alpha} are plotted.
+In case \code{alpha} is missing or \code{NULL}, all fits in \code{x} are plotted.
+If \code{what = "coef.path"}, plot the coefficient path for the fit with the given
+hyper-parameter value or, in case \code{alpha} is missing, for the first value in \code{x$alpha}.}
+
 \item{se_mult}{if plotting CV performance, multiplier of the estimated SE.}
 
 \item{...}{currently ignored.}
 }
 \description{
-Plot the cross-validation performance or the coefficient path for fitted penalized elastic net S- or LS-estimates
-of regression.
+Plot the cross-validation performance or the coefficient path for fitted penalized
+elastic net S- or LS-estimates of regression.
 }
 \examples{
 # Compute the PENSE regularization path for Freeny's revenue data
@@ -29,11 +34,12 @@ regpath <- pense(x, freeny$y, alpha = 0.5)
 plot(regpath)
 
 # Extract the coefficients at a certain penalization level
-coef(regpath, lambda = regpath$lambda[40])
+coef(regpath, lambda = regpath$lambda[[1]][[40]])
 
 # What penalization level leads to good prediction performance?
-cv_results <- pense_cv(x, freeny$y, alpha = 0.5, cv_repl = 2,
-                       cv_k = 4)
+set.seed(123)
+cv_results <- pense_cv(x, freeny$y, alpha = 0.5,
+                       cv_repl = 2, cv_k = 4)
 plot(cv_results, se_mult = 1)
 
 # Extract the coefficients at the penalization level with
@@ -41,7 +47,7 @@ plot(cv_results, se_mult = 1)
 coef(cv_results)
 # ... or at the penalization level with prediction error
 # statistically indistinguishable from the minimum.
-coef(cv_results, lambda = 'se')
+coef(cv_results, lambda = '1-se')
 }
 \seealso{
 Other functions for plotting and printing: 

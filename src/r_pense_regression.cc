@@ -51,6 +51,7 @@ using PenaltyList = FwdList<typename Optimizer::PenaltyFunction>;
 namespace {
 constexpr double kDefaultExploreTol = 0.1;
 constexpr double kDefaultComparisonTol = 1e-3;
+constexpr double kDefaultExploreIt = 20;
 constexpr int kDefaultMaxOptima = 25;
 constexpr int kDefaultTracks = 10;
 constexpr bool kDefaultStrategy0 = true;
@@ -251,6 +252,7 @@ SEXP PenseRegressionImpl(SOptimizer optimizer, SEXP r_x, SEXP r_y, SEXP r_penalt
                                                GetFallback(pense_opts, "max_optima", kDefaultMaxOptima),
                                                GetFallback(pense_opts, "nr_tracks", kDefaultTracks),
                                                GetFallback(pense_opts, "explore_tol", kDefaultExploreTol),
+                                               GetFallback(pense_opts, "explore_it", kDefaultExploreIt),
                                                GetFallback(pense_opts, "comparison_tol", kDefaultComparisonTol),
                                                GetFallback(pense_opts, "num_threads", kDefaultNumberOfThreads));
 
@@ -488,7 +490,7 @@ SEXP PenseEnRegression(SEXP x, SEXP y, SEXP penalties, SEXP enpy_inds,
 //!                       `pen_loadings` ... optional vector of length `p` with non-negative penalty loadings.
 SEXP PenseMaxLambda(SEXP r_x, SEXP r_y, SEXP r_pense_opts, SEXP r_optional_args) noexcept {
   BEGIN_RCPP
-  std::unique_ptr<const nsoptim::PredictorResponseData> data = MakePredictorResponseData(r_x, r_y);
+  auto data = MakePredictorResponseData(r_x, r_y);
   const auto pense_opts = as<Rcpp::List>(r_pense_opts);
   const auto optional_args = as<Rcpp::List>(r_optional_args);
   pense::Mscale<pense::RhoBisquare> mscale(as<Rcpp::List>(pense_opts["mscale"]));

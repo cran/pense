@@ -97,19 +97,23 @@ elnet <- function(x, y, alpha, nlambda = 100, lambda_min_ratio, lambda, penalty_
                              intercept = args$intercept,
                              optional_args = args$optional_args)
 
-      fit$estimates <- lapply(fit$estimates, function (est) {
-        args$restore_coef_length(args$std_data$unstandardize_coefs(est))
-      })
+      fit$estimates <- lapply(
+        unlist(fit$estimates, recursive = FALSE),
+        function (est) {
+          args$restore_coef_length(args$std_data$unstandardize_coefs(est))
+        })
       fit$estimates <- .metrics_attrib(fit$estimates, fit$metrics)
-      fit$lambda <- unlist(vapply(fit$estimates, FUN = `[[`, FUN.VALUE = numeric(1),
-                                  'lambda'), use.names = FALSE, recursive = FALSE)
+      fit$lambda <- unlist(vapply(fit$estimates, FUN.VALUE = numeric(1),
+                                  FUN = `[[`, 'lambda'),
+                           use.names = FALSE, recursive = FALSE)
       fit$alpha <- alpha
       fit
     })
 
   structure(list(
     call = call,
-    lambda = lapply(fits, `[[`, 'lambda'),
+    lambda = args$lambda,
+    metrics = lapply(fits, function (f) { attr(f$estimates, 'metrics') }),
     estimates = unlist(lapply(fits, `[[`, 'estimates'), recursive = FALSE, use.names = FALSE),
     alpha = vapply(fits, FUN.VALUE = numeric(1L), FUN = `[[`, 'alpha', USE.NAMES = FALSE)),
     class = c('pense_en', 'pense_fit'))
@@ -138,7 +142,7 @@ elnet <- function(x, y, alpha, nlambda = 100, lambda_min_ratio, lambda, penalty_
 #' @seealso [plot.pense_cvfit()] for plotting the CV performance or the regularization path.
 #' @example examples/ls_elnet.R
 #'
-#' @importFrom lifecycle deprecate_warn deprecated is_present
+#' @importFrom lifecycle deprecate_stop deprecated is_present
 #' @importFrom stats sd
 #' @export
 elnet_cv <- function (x, y, lambda, cv_k, cv_repl = 1,
@@ -173,7 +177,7 @@ elnet_cv <- function (x, y, lambda, cv_k, cv_repl = 1,
   }
 
   if (is_present(ncores)) {
-    deprecate_warn('2.0.0', 'elnet_cv(ncores=)',
+    deprecate_stop('2.0.0', 'elnet_cv(ncores=)',
                    details = "Please specify the `parallel` cluster with argument `cl`.")
   }
   if (!is.null(cl) && !is(cl, 'cluster')) {
@@ -207,21 +211,29 @@ elnet_cv <- function (x, y, lambda, cv_k, cv_repl = 1,
     args$alpha, args$lambda,
     SIMPLIFY = FALSE, USE.NAMES = FALSE,
     FUN = function (alpha, lambda) {
-      cv_fun <- function (train_data, test_ind) {
-        cv_fit <- .elnet_internal(train_data$x, train_data$y,
-                                  alpha = alpha,
-                                  lambda = lambda,
-                                  penalty_loadings = args$penalty_loadings,
-                                  weights = args$weights[-test_ind],
-                                  intercept = args$intercept,
-                                  optional_args = args$optional_args)
-        cv_fit$estimates
+      cv_fun <- function (train_data, test_ind, handler_args) {
+        cv_fit <- .elnet_internal(
+          train_data$x, train_data$y,
+          alpha = handler_args$alpha,
+          lambda = handler_args$lambda,
+          penalty_loadings = handler_args$args$penalty_loadings,
+          weights = handler_args$args$weights[-test_ind],
+          intercept = handler_args$args$intercept,
+          optional_args = handler_args$args$optional_args)
+
+        lapply(cv_fit$estimates, `[[`, 1L)
       }
 
       set.seed(fit_seed)
-      cv_perf <- .run_replicated_cv(args$std_data, cv_k = cv_k, cv_repl = cv_repl,
-                                    metric = cv_metric, cv_est_fun = cv_fun,
-                                    par_cluster = cl)
+      cv_perf <- .run_replicated_cv(args$std_data,
+                                    cv_k = cv_k,
+                                    cv_repl = cv_repl,
+                                    metric = cv_metric,
+                                    cv_est_fun = cv_fun,
+                                    par_cluster = cl,
+                                    handler_args = list(args = args,
+                                                        alpha = alpha,
+                                                        lambda = lambda))
 
       data.frame(lambda = lambda, alpha = alpha,
                  cvavg = rowMeans(cv_perf),
@@ -255,12 +267,15 @@ elnet_cv <- function (x, y, lambda, cv_k, cv_repl = 1,
                              intercept = args$intercept,
                              optional_args = args$optional_args)
 
-      fit$estimates <- lapply(fit$estimates, function (est) {
-        args$restore_coef_length(args$std_data$unstandardize_coefs(est))
-      })
+      fit$estimates <- lapply(
+        unlist(fit$estimates, recursive = FALSE),
+        function (est) {
+          args$restore_coef_length(args$std_data$unstandardize_coefs(est))
+        })
       fit$estimates <- .metrics_attrib(fit$estimates, fit$metrics)
-      fit$lambda <- unlist(vapply(fit$estimates, FUN = `[[`, FUN.VALUE = numeric(1),
-                                  'lambda'), use.names = FALSE, recursive = FALSE)
+      fit$lambda <- unlist(vapply(fit$estimates, FUN.VALUE = numeric(1),
+                                  FUN = `[[`, 'lambda'),
+                           use.names = FALSE, recursive = FALSE)
       fit$alpha <- alpha
       fit
     })
@@ -269,7 +284,8 @@ elnet_cv <- function (x, y, lambda, cv_k, cv_repl = 1,
     call = call,
     cvres = cv_curves,
     cv_measure = cv_measure_str,
-    lambda = lapply(fits, `[[`, 'lambda'),
+    lambda = args$lambda,
+    metrics = lapply(fits, function (f) { attr(f$estimates, 'metrics') }),
     estimates = unlist(lapply(fits, `[[`, 'estimates'), recursive = FALSE, use.names = FALSE),
     alpha = vapply(fits, FUN.VALUE = numeric(1L), FUN = `[[`, 'alpha', USE.NAMES = FALSE)),
     class = c('pense_en', 'pense_cvfit'))
@@ -293,7 +309,7 @@ elnet_cv <- function (x, y, lambda, cv_k, cv_repl = 1,
 }
 
 ## Check and parse user-supplied arguments
-#' @importFrom lifecycle deprecate_warn deprecated is_present
+#' @importFrom lifecycle deprecate_stop deprecated is_present
 #' @importFrom rlang warn abort
 #' @importFrom stats runif
 .elnet_args <- function (x, y, alpha, nlambda = 100, lambda_min_ratio, lambda, penalty_loadings, weights,
@@ -302,15 +318,15 @@ elnet_cv <- function (x, y, lambda, cv_k, cv_repl = 1,
   optional_args <- list()
 
   if (is_present(options)) {
-    deprecate_warn('2.0.0', 'elnet(options=)', 'elnet(en_algorithm_opts=)')
+    deprecate_stop('2.0.0', 'elnet(options=)', 'elnet(en_algorithm_opts=)')
   }
 
   if (is_present(correction)) {
-    deprecate_warn('2.0.0', 'elnet(correction=)', 'coef()')
+    deprecate_stop('2.0.0', 'elnet(correction=)', 'coef()')
   }
 
   if (is_present(xtest)) {
-    deprecate_warn('2.0.0', 'elnet(xtest=)')
+    deprecate_stop('2.0.0', 'elnet(xtest=)')
   }
 
   # Normalize input

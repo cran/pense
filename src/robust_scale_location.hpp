@@ -11,6 +11,7 @@
 
 #include <exception>
 #include <string>
+#include <cmath>
 
 #include "nsoptim.hpp"
 #include "rho.hpp"
@@ -72,9 +73,12 @@ class Mscale {
   //!
   //! @param user_options an R list of user options.
   explicit Mscale(const Rcpp::List& user_options) noexcept
-    : rho_(GetFallback(user_options, "cc", robust_scale_location::DefaultMscaleConstant<RhoFunction>::value)),
-      delta_(GetFallback(user_options, "delta", robust_scale_location::kDefaultMscaleDelta)),
-      max_it_(GetFallback(user_options, "max_it", robust_scale_location::kDefaultMscaleMaxIt)),
+    : rho_(GetFallback(user_options, "cc",
+        robust_scale_location::DefaultMscaleConstant<RhoFunction>::value)),
+      delta_(GetFallback(user_options, "delta",
+        robust_scale_location::kDefaultMscaleDelta)),
+      max_it_(GetFallback(user_options, "max_it",
+        robust_scale_location::kDefaultMscaleMaxIt)),
       eps_(GetFallback(user_options, "eps", kDefaultConvergenceTolerance)),
       scale_(-1) {}
 
@@ -103,10 +107,16 @@ class Mscale {
   //!
   //! @param values a vector of values.
   //! @return the M-scale of the given values.
-  double operator()(const arma::vec& values, double scale = -1) const {
-    if (scale < 0) {
-      scale = InitialEstimate(values);
-    }
+  double operator()(const arma::vec& values) const {
+    return ComputeMscale(values, InitialEstimate(values));
+  }
+
+  //! Compute the M-scale of the given values. The initial guess is either the given scale (if positive),
+  //! the previous scale estimate (if availalbe), or the median of the absolute values (MAD).
+  //!
+  //! @param values a vector of values.
+  //! @return the M-scale of the given values.
+  double operator()(const arma::vec& values, double scale) const {
     return ComputeMscale(values, scale);
   }
 
@@ -119,6 +129,137 @@ class Mscale {
   double operator()(const arma::vec& values) {
     scale_ = ComputeMscale(values, InitialEstimate(values));
     return scale_;
+  }
+
+  //! Set the initial estimate of the scale.
+  //!
+  //! @param scale initial scale estimate (> 0).
+  void SetInitial(const double scale) noexcept {
+    scale_ = scale;
+  }
+
+  //! Get the number of iterations required for the last scale estimate.
+  //!
+  //! @return number of iterations, or -1 if none have been performed yet.
+  int LastIterations() const noexcept {
+    return it_;
+  }
+
+  //! Compute the 1st derivative of the M-scale function with respect to each element.
+  //!
+  //! @param values vector of values
+  //! @return a vector of derivatives, one for each element in `values`. If the scale is 0 or the M-scale equation
+  //!   is violated, an empty vector is returned.
+  arma::vec Derivative(const arma::vec& values) const {
+    const double scale = ComputeMscale(values, InitialEstimate(values));
+    if (scale < eps_) {
+      return arma::vec();
+    }
+
+    const auto deriv_rho = rho_.Derivative(values, scale);
+    const auto denom = sum(deriv_rho % values) / scale;
+    if (denom < eps_) {
+      return arma::vec(values.n_elem, arma::fill::value(R_PosInf));
+    } else {
+      return deriv_rho / denom;
+    }
+  }
+
+  //! Compute the gradient and Hessian of the M-scale
+  //! function evaluated at the given vector.
+  //!
+  //! @param values vector of values
+  //! @return a matrix of dimension n x n + 1, where the 1st column is the
+  //!    gradient and the other columns are the Hessian matrix.
+  //!    If the scale is 0 or the M-scale equation
+  //!    is violated, an empty matrix is returned.
+  arma::mat GradientHessian(const arma::vec& values) {
+    const double scale = this->operator()(values);
+    if (scale < eps_) {
+      return arma::mat(1, 1, arma::fill::value(scale));
+    }
+    const auto violation = rho_.SumStd(values, scale) / values.n_elem - delta_;
+
+    arma::mat grad_hess(values.n_elem, values.n_elem + 2, arma::fill::zeros);
+
+    // Compute the gradient and its maximum
+    grad_hess.col(0) = rho_.Derivative(values, scale);
+    const auto denom = arma::sum(grad_hess.col(0) % values);
+
+    grad_hess.at(1, 2) = denom;
+    grad_hess.at(2, 2) = scale;
+    grad_hess.at(3, 2) = violation;
+
+    // Compute the Hessian and its maximum
+    const auto rho_2nd = rho_.SecondDerivative(values, scale);
+    const auto sum_2nd = arma::sum(rho_2nd % values % values) / denom;
+    grad_hess.col(1) = rho_2nd;
+    double diag_offset;
+    for (int i = 0; i < values.n_elem; ++i) {
+      diag_offset = denom * rho_2nd[i];
+      for (int k = i; k < values.n_elem; ++k) {
+        grad_hess(i, k + 2) = HessianElementUnscaled(
+          i, k, grad_hess.unsafe_col(0), rho_2nd, values, sum_2nd, diag_offset);
+
+        grad_hess(i, k + 2) *= scale / (denom * denom);
+        diag_offset = 0;
+      }
+    }
+
+    // Final pass to get gradient right
+    grad_hess.col(0) *= scale / denom;
+
+    return grad_hess;
+  }
+
+  //! Compute the maximum of the 1st and 2nd derivatives of the M-scale
+  //! function evaluated at all elements in the given vector.
+  //!
+  //! @param values vector of values
+  //! @return a vector with 3 elements: the M-scale,
+  //!    the maximum element of the gradient
+  //!    and the maximum element in the Hessian.
+  //!    If the scale is 0 or the M-scale equation
+  //!    is violated, an empty vector is returned.
+  arma::vec::fixed<3> MaxGradientHessian(const arma::vec& values) {
+    arma::vec::fixed<3> maxima(arma::fill::zeros);
+    maxima[0] = this->operator()(values, InitialEstimate(values));
+    if (maxima[0] < eps_) {
+      return maxima;
+    }
+    const auto violation = rho_.SumStd(values, maxima[0]) -
+      values.n_elem * delta_;
+
+    if (violation * violation > values.n_elem * values.n_elem * eps_ * eps_) {
+      return maxima;
+    }
+
+    // Compute the gradient and its maximum
+    const auto rho_1st = rho_.Derivative(values, maxima[0]);
+    const auto denom = sum(rho_1st % values);
+    maxima[1] = (denom < eps_) ? R_PosInf :
+      (arma::max(rho_1st) * maxima[0] / denom);
+
+    // Compute the Hessian and its maximum
+    const auto rho_2nd = rho_.SecondDerivative(values, maxima[0]);
+    const auto sum_2nd = sum(rho_2nd % values % values) / denom;
+    double diag_offset;
+
+    for (int i = 0; i < values.n_elem; ++i) {
+      diag_offset = denom * rho_2nd[i];
+      for (int k = i; k < values.n_elem; ++k) {
+        const auto tmp = std::abs(HessianElementUnscaled(
+          i, k, rho_1st, rho_2nd, values, sum_2nd, diag_offset));
+
+        diag_offset = 0;
+        if (tmp > maxima[2]) {
+          maxima[2] = tmp;
+        }
+      }
+    }
+    maxima[2] *= maxima[0] / (denom * denom);
+
+    return maxima;
   }
 
   //! Get the rho function object.
@@ -142,11 +283,52 @@ class Mscale {
   }
 
  private:
-  double ComputeMscale(const arma::vec& values, double scale) const {
-    const double rho_denom = 1. / (delta_ * values.n_elem);
-    if (scale < kNumericZero) {
+  double ComputeMscale(const arma::vec& values, const double init_scale) const {
+    if (init_scale < kNumericZero) {
       return 0;
     }
+
+    int iter = 0;
+    double step;
+    double scale = init_scale;
+    // Start Newton's iterations
+    do {
+      step = rho_.DerivativeFixedPoint(values, scale, delta_);
+      scale += scale * step;
+    } while (++iter < max_it_ && std::abs(step) > eps_ && scale > kNumericZero && std::isfinite(scale));
+
+    if (scale < kNumericZero || !std::isfinite(scale)) {
+      return ComputeMscaleFallback(values, max_it_ - iter, init_scale);
+    }
+
+    return scale;
+  }
+
+  double ComputeMscale(const arma::vec& values, const double init_scale) {
+    if (init_scale < kNumericZero) {
+      return 0;
+    }
+
+    it_ = 0;
+    double step;
+    double scale = init_scale;
+    // Start Newton's iterations
+    do {
+      step = rho_.DerivativeFixedPoint(values, scale, delta_);
+      scale += scale * step;
+    } while (++it_ < max_it_ && std::abs(step) > eps_ && scale > kNumericZero && std::isfinite(scale));
+
+    if (scale < kNumericZero || !std::isfinite(scale)) {
+      return ComputeMscaleFallback(values, max_it_ - it_, init_scale);
+    }
+
+    return scale;
+  }
+
+  //! The Newton iterations are unstable if outliers have a strong effect on the scale estimate.
+  //! In these cases, the sublinear method works more reliably, but it is slow.
+  double ComputeMscaleFallback(const arma::vec& values, const int max_it, double scale) const {
+    const double rho_denom = 1. / (delta_ * values.n_elem);
 
     int iter = 0;
     double err = eps_;
@@ -154,9 +336,13 @@ class Mscale {
     do {
       const double rho_sum = rho_.SumStd(values, scale);
       const double new_scale = scale * std::sqrt(rho_sum * rho_denom);
-      err = std::abs(new_scale / scale - 1.);
+      err = std::abs(new_scale - scale);
       scale = new_scale;
-    } while (++iter < max_it_ && err > eps_);
+    } while (++iter < max_it && err > eps_ * scale && std::isfinite(scale));
+
+    if (scale < kNumericZero || !std::isfinite(scale)) {
+      scale = 0;
+    }
 
     return scale;
   }
@@ -169,9 +355,22 @@ class Mscale {
     return robust_scale_location::InitialScaleEstimate(values, delta_, eps_);
   }
 
+  double HessianElementUnscaled(const int i, const int k,
+                                const arma::vec& rho_1st,
+                                const arma::vec& rho_2nd,
+                                const arma::vec& values,
+                                const double sum_2nd,
+                                const double diag_offset) const {
+    return diag_offset +
+      rho_1st[i] * rho_1st[k] * sum_2nd -
+      rho_1st[i] * rho_2nd[k] * values[k] -
+      rho_1st[k] * rho_2nd[i] * values[i];
+  }
+
   RhoFunction rho_;
   double delta_;
   int max_it_;
+  int it_ = -1;
   double eps_;
   double scale_;
 };

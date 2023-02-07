@@ -1,3 +1,11 @@
+# pense 2.2.0
+  * Fix bug where argument `max_solutions` is not used correctly.
+  * Add new numerical coordinate-descent algorithms for LS-EN (`en_cd_options()`).
+  * Revamp the regularization path and how starting points are used and shared.
+  * Share starting points across CV folds and replications.
+  * Address changes in the upcoming Rcpp release.
+
+
 # pense 2.1.0
   * Penalty loadings are now applied to both the L1 and L2 parts of the EN penalty.
     This will lead to different results for adaptive PENSE and other adaptive estimators when fitted with *alpha < 1*!

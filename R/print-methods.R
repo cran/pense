@@ -38,7 +38,7 @@ summary.pense_cvfit <- function (object, alpha, lambda = 'min', se_mult = 1, ...
   }
   tryCatch({
     cat(method_name, "fit", "with", "prediction", "performance", "estimated", "by",
-        object$call$cv_repl, "replications", "of", sprintf("%d-fold", object$call$cv_k),
+        object$cv_repl, "replications", "of", sprintf("%d-fold", object$call$cv_k),
         "cross-validation.\n", sep = " ", fill = TRUE)
   }, error = function(...) {
     cat(method_name, "fit", "with", "prediction", "performance", "estimated", "via",
@@ -171,7 +171,7 @@ prediction_performance <- function (..., alpha = NULL, lambda = 'min', se_mult =
           (est$lambda - object$cvres$lambda[[ind]])^2 < .Machine$double.eps
       }))
       if (length(est_ind) > 0L) {
-        sum(abs(object$estimates[[est_ind]]$beta) > .Machine$double.eps)
+        as.integer(sum(abs(object$estimates[[est_ind]]$beta) > .Machine$double.eps))
       } else {
         NA_integer_
       }

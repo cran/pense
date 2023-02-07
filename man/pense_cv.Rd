@@ -14,6 +14,7 @@ pense_cv(
   cv_repl = 1,
   cv_metric = c("tau_size", "mape", "rmspe", "auroc"),
   fit_all = TRUE,
+  fold_starts = c("full", "enpy", "both"),
   cl = NULL,
   ...
 )
@@ -26,13 +27,15 @@ adapense_cv(x, y, alpha, alpha_preliminary = 0, exponent = 1, ...)
 \item{y}{vector of response values of length \code{n}.
 For binary classification, \code{y} should be a factor with 2 levels.}
 
-\item{standardize}{whether to standardize the \code{x} variables prior to fitting the PENSE estimates.
-Can also be set to \code{"cv_only"}, in which case the input data is not standardized, but the
-training data in the CV folds is scaled to match the scaling of the input data.
+\item{standardize}{whether to standardize the \code{x} variables prior to fitting
+the PENSE estimates. Can also be set to \code{"cv_only"}, in which case the
+input data is not standardized, but the training data in the CV folds is
+scaled to match the scaling of the input data.
 Coefficients are always returned on the original scale.
 This can fail for variables with a large proportion of a single value
 (e.g., zero-inflated data).
-In this case, either compute with \code{standardize = FALSE} or standardize the data manually.}
+In this case, either compute with \code{standardize = FALSE} or standardize
+the data manually.}
 
 \item{lambda}{optional user-supplied sequence of penalization levels. If given and not \code{NULL},
 \code{nlambda} and \code{lambda_min_ratio} are ignored.}
@@ -58,6 +61,14 @@ respectively.
 Setting \code{fit_all} to \code{FALSE} is equivalent to \code{"min"}.
 Applies to all \code{alpha} value.}
 
+\item{fold_starts}{how to determine starting values in the
+cross-validation folds. If \code{"full"} (default), use the best solution from
+the fit to the full data as starting value. This implies
+\code{fit_all=TRUE}.
+If \code{"enpy"} compute separate ENPY initial estimates in each fold.
+The option \code{"both"} uses both.
+These starts are in addition to the starts provided in \code{other_starts}.}
+
 \item{cl}{a \link[parallel:makeCluster]{parallel} cluster. Can only be used in combination with
 \code{ncores = 1}.}
 
@@ -82,18 +93,15 @@ level is added to the grid of penalization levels (either the manually specified
 \code{lambda} or the automatically generated grid of size \code{nlambda}).
 If \code{standardize = TRUE}, the starting points are also scaled.}
     \item{\code{intercept}}{include an intercept in the model.}
-    \item{\code{bdp}}{desired breakdown point of the estimator, between 0 and 0.5. The actual
+    \item{\code{bdp}}{desired breakdown point of the estimator, between 0.05 and 0.5. The actual
 breakdown point may be slightly larger/smaller to avoid instabilities of the S-loss.}
-    \item{\code{cc}}{tuning constant for the S-estimator. Default is to chosen based on the breakdown
-point \code{bdp}. Does \emph{not} affect the estimated coefficients, only the estimated scale of
-the residuals.}
+    \item{\code{cc}}{tuning constant for the S-estimator. Default is chosen based on the breakdown
+point \code{bdp}. This affects the estimated coefficients only if
+\code{standardize=TRUE}. Otherwise only the estimated scale of the residuals
+would be affected.}
     \item{\code{eps}}{numerical tolerance.}
     \item{\code{explore_solutions}}{number of solutions to compute up to the desired precision \code{eps}.}
-    \item{\code{explore_tol}}{numerical tolerance and maximum number of iterations for
-exploring possible solutions. The tolerance should be (much) looser than \code{eps} to be useful,
-and the number of iterations should also be much smaller than the maximum number of
-iterations given via \code{algorithm_opts}.}
-    \item{\code{explore_it}}{numerical tolerance and maximum number of iterations for
+    \item{\code{explore_tol,explore_it}}{numerical tolerance and maximum number of iterations for
 exploring possible solutions. The tolerance should be (much) looser than \code{eps} to be useful,
 and the number of iterations should also be much smaller than the maximum number of
 iterations given via \code{algorithm_opts}.}
@@ -107,6 +115,8 @@ squared \eqn{L_2} norm of the difference vector is less than \code{comparison_to
 description.}
     \item{\code{enpy_specific}}{use the EN-PY initial estimates only at the penalization level they
 are computed for. See details for a description.}
+    \item{\code{carry_forward}}{carry the best solutions forward to the next penalty
+level.}
     \item{\code{sparse}}{use sparse coefficient vectors.}
     \item{\code{ncores}}{number of CPU cores to use in parallel. By default, only one CPU core is used.
 Not supported on all platforms, in which case a warning is given.}
@@ -116,7 +126,7 @@ See \code{\link[=mm_algorithm_options]{mm_algorithm_options()}} for details.}
 for details.}
     \item{\code{enpy_opts}}{options for the ENPY initial estimates, created with the
 \code{\link[=enpy_options]{enpy_options()}} function. See \code{\link[=enpy_initial_estimates]{enpy_initial_estimates()}} for details.}
-    \item{\code{cv_objective}}{deprecated and ignored. See \code{\link[=pense_cv]{pense_cv()}} for estimating
+    \item{\code{cv_k,cv_objective}}{deprecated and ignored. See \code{\link[=pense_cv]{pense_cv()}} for estimating
 prediction performance via cross-validation.}
   }}
 
@@ -126,7 +136,8 @@ Can be a vector of several values, but \code{alpha = 0} cannot be mixed with oth
 
 \item{alpha_preliminary}{\code{alpha} parameter for the preliminary estimate.}
 
-\item{exponent}{the exponent for computing the penalty loadings based on the preliminary estimate.}
+\item{exponent}{the exponent for computing the penalty loadings based on
+the preliminary estimate.}
 }
 \value{
 a list-like object with the same components as returned by \code{\link[=pense]{pense()}},
@@ -139,13 +150,15 @@ a list-like object as returned by \code{\link[=pense_cv]{pense_cv()}} plus the f
 \describe{
 \item{\code{preliminary}}{the CV results for the preliminary estimate.}
 \item{\code{exponent}}{exponent used to compute the penalty loadings.}
-\item{\code{penalty_loadings}}{the penalty loadings used for the adaptive PENSE estimate.}
+\item{\code{penalty_loadings}}{penalty loadings used for the
+adaptive PENSE estimate.}
 }
 }
 \description{
 Perform (repeated) K-fold cross-validation for \code{\link[=pense]{pense()}}.
 
-\code{adapense_cv()} is a convenience wrapper to compute adaptive PENSE estimates.
+\code{adapense_cv()} is a convenience wrapper to compute adaptive
+PENSE estimates.
 }
 \details{
 The built-in CV metrics are
@@ -160,10 +173,13 @@ Only sensible for binary responses.}
 
 \code{adapense_cv()} is a convenience wrapper which performs 3 steps:
 \enumerate{
-\item compute preliminary estimates via \code{pense_cv(..., alpha = alpha_preliminary)},
-\item computes the penalty loadings from the estimate \code{beta} with best prediction performance by
+\item compute preliminary estimates via
+\code{pense_cv(..., alpha = alpha_preliminary)},
+\item computes the penalty loadings from the estimate \code{beta} with best
+prediction performance by
 \code{adapense_loadings = 1 / abs(beta)^exponent}, and
-\item compute the adaptive PENSE estimates via \code{pense_cv(..., penalty_loadings = adapense_loadings)}.
+\item compute the adaptive PENSE estimates via
+\code{pense_cv(..., penalty_loadings = adapense_loadings)}.
 }
 }
 \examples{
@@ -207,11 +223,13 @@ plot(ada_manual)
 par(def.par)
 }
 \seealso{
-\code{\link[=pense]{pense()}} for computing regularized S-estimates without cross-validation.
+\code{\link[=pense]{pense()}} for computing regularized S-estimates without
+cross-validation.
 
 \code{\link[=coef.pense_cvfit]{coef.pense_cvfit()}} for extracting coefficient estimates.
 
-\code{\link[=plot.pense_cvfit]{plot.pense_cvfit()}} for plotting the CV performance or the regularization path.
+\code{\link[=plot.pense_cvfit]{plot.pense_cvfit()}} for plotting the CV performance or the
+regularization path.
 
 Other functions to compute robust estimates with CV: 
 \code{\link{pensem_cv}()},

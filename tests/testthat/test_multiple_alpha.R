@@ -56,12 +56,15 @@ test_that("pense_cv() with multiple alpha", {
   x <- matrix(rcauchy(n * p), ncol = p)
   y <- 2 + rowSums(x[, 1:5]) / 5 + rnorm(n, sd = 4)
 
+  max_solutions <- 10
+
   pr <- pense_cv(x, y,
-                 cv_k = 3, cv_repl = 2,
-                 fit_all = c('min', '1-se', '2-se'),
+                 cv_k = 3, cv_repl = 10,
+                 fit_all = TRUE,
                  alpha = c(0.1, 0.8),
                  nlambda = nlambda,
                  nlambda_enpy = 5,
+                 max_solutions = max_solutions,
                  ncores = 2L,
                  bdp = 0.25,
                  sparse = FALSE, eps = 1e-8,
@@ -72,9 +75,10 @@ test_that("pense_cv() with multiple alpha", {
   expect_type(pr$lambda, 'list')
   expect_type(pr$lambda[[1L]], 'double')
   expect_type(pr$lambda[[2L]], 'double')
-  expect_length(pr$lambda[[1L]], 2)
-  expect_length(pr$lambda[[2L]], 2)
-  expect_length(pr$estimates, 4)
+  expect_length(pr$lambda[[1L]], nlambda)
+  expect_length(pr$lambda[[2L]], nlambda)
+  expect_true(length(pr$estimates) >= 2 * nlambda)
+  expect_true(length(pr$estimates) <= 2 * max_solutions * nlambda)
   expect_length(pr$cvres$lambda, 2 * nlambda)
   expect_length(pr$cvres$alpha, 2 * nlambda)
   expect_length(pr$cvres$cvavg, 2 * nlambda)
@@ -149,7 +153,7 @@ test_that("regmest_cv() with multiple alpha", {
 
   pr <- regmest_cv(x, y,
                    cv_k = 3, cv_repl = 2,
-                   fit_all = c('min', '1-se', '2-se'),
+                   fit_all = TRUE,
                    scale = 1.11,
                    alpha = c(0.1, 0.8),
                    nlambda = nlambda,
@@ -162,9 +166,9 @@ test_that("regmest_cv() with multiple alpha", {
   expect_type(pr$lambda, 'list')
   expect_type(pr$lambda[[1L]], 'double')
   expect_type(pr$lambda[[2L]], 'double')
-  expect_length(pr$lambda[[1L]], 2)
-  expect_length(pr$lambda[[2L]], 2)
-  expect_length(pr$estimates, 4)
+  expect_length(pr$lambda[[1L]], nlambda)
+  expect_length(pr$lambda[[2L]], nlambda)
+  expect_length(pr$estimates, 2 * nlambda)
   expect_length(pr$cvres$lambda, 2 * nlambda)
   expect_length(pr$cvres$alpha, 2 * nlambda)
   expect_length(pr$cvres$cvavg, 2 * nlambda)

@@ -82,7 +82,9 @@ class InnerToleranceTightening {
   virtual void Tighten(const double) noexcept {}
 
   //! Tighten the inner convergence tolerance more aggressively.
-  virtual void FastTighten() noexcept {}
+  virtual void FastTighten() noexcept {
+    FullyTighten(IsIterativeAlgorithmTag{});
+  }
 
   //! Make the inner convergence tolerance as small as possible.
   void FullyTighten() noexcept {
@@ -178,7 +180,8 @@ class AdaptiveTightening : public InnerToleranceTightening<Optimizer> {
   explicit AdaptiveTightening(Optimizer* optimizer, const double outer_tolerance, const double inner_tolerance,
                               const int steps) noexcept
       : InnerToleranceTightening<Optimizer>(optimizer, inner_tolerance),
-        multiplier_(std::pow(inner_tolerance / std::sqrt(outer_tolerance), 1. / steps)) {
+        multiplier_(std::pow(inner_tolerance / std::sqrt(outer_tolerance), 1. / steps)),
+        min_inner_tolerance_(inner_tolerance * 0.1) {
     // Start with the sqrt of the outer tolerance.
     this->PropagateUpdate(std::sqrt(outer_tolerance));
   }
@@ -187,16 +190,17 @@ class AdaptiveTightening : public InnerToleranceTightening<Optimizer> {
   void Tighten(const double outer_change) noexcept override {
     const double tol = this->current_tolerance();
     if (outer_change < tol) {
-      this->PropagateUpdate(tol * multiplier_);
+      this->PropagateUpdate(std::max(tol * multiplier_, min_inner_tolerance_));
     }
   }
 
   void FastTighten() noexcept override {
-    this->PropagateUpdate(this->current_tolerance() * multiplier_ * multiplier_);
+    this->PropagateUpdate(std::max(this->current_tolerance() * multiplier_ * multiplier_, min_inner_tolerance_));
   }
 
  private:
   const double multiplier_;
+  const double min_inner_tolerance_;
 };
 
 }  // namespace mm_optimizer
@@ -300,7 +304,7 @@ class MMOptimizer : public Optimizer<LossFunction, PenaltyFunction, Coefficients
   //! Access the penalty function.
   //!
   //! @return the penalty function currently in use by the optimizer.
-  PenaltyFunction& penalty() const noexcept {
+  PenaltyFunction& penalty() const {
     if (!penalty_) {
       throw std::logic_error("no penalty set");
     }
@@ -364,9 +368,6 @@ class MMOptimizer : public Optimizer<LossFunction, PenaltyFunction, Coefficients
   //! @param max_it maximum number of iterations.
   //! @return information about the optimum.
   Optimum Optimize(const int max_it) {
-    using LossHasDifferenceOp = typename traits::has_difference_op<LossFunction, Coefficients>::type;
-    using PenaltyHasDifferenceOp = typename traits::has_difference_op<LossFunction, Coefficients>::type;
-
     if (!loss_) {
       throw std::logic_error("no loss set");
     }
@@ -385,7 +386,16 @@ class MMOptimizer : public Optimizer<LossFunction, PenaltyFunction, Coefficients
 
     // Set the convex surrogates for the internal optimizer.
     auto residuals = loss_->Residuals(coefs_);
-    optimizer_.loss(loss_->GetConvexSurrogate(residuals));
+
+    try {
+      optimizer_.loss(loss_->GetConvexSurrogate(residuals));
+    } catch(...) {
+      metrics->AddMetric("iter", 0);
+      metrics->AddDetail("final_rel_difference", 0);
+      metrics->AddDetail("final_innner_tol", 0);
+      return MakeOptimum(*loss_, *penalty_, coefs_, residuals, std::move(metrics), OptimumStatus::kWarning,
+                          "MM-algorithm did not converge");
+    }
     optimizer_.penalty(penalty_->GetConvexSurrogate(coefs_));
 
     std::unique_ptr<mm_optimizer::InnerToleranceTightening<InnerOptimizerType>> tightener;
@@ -409,6 +419,7 @@ class MMOptimizer : public Optimizer<LossFunction, PenaltyFunction, Coefficients
     // Often, the results from the convex surrogate can be used to quickly evaluate the loss/penalty function.
     double objf_value = loss_->Evaluate(residuals) + penalty_->Evaluate(coefs_);
     double rel_difference = 0;
+    bool restart_inner = true;
     bool final_iterations = false;
     int iter = 0;
 
@@ -417,7 +428,8 @@ class MMOptimizer : public Optimizer<LossFunction, PenaltyFunction, Coefficients
       auto&& iter_metrics = metrics->CreateSubMetrics("mm_iteration");
 
       // Compute the minimizer of the convex surrogates.
-      auto optimum = optimizer_.Optimize();
+      auto optimum = restart_inner ? optimizer_.Optimize(coefs_) : optimizer_.Optimize();
+      restart_inner = false;
       if (optimum.metrics) {
         iter_metrics.AddSubMetrics(std::move(*optimum.metrics));
         optimum.metrics.reset();
@@ -433,53 +445,53 @@ class MMOptimizer : public Optimizer<LossFunction, PenaltyFunction, Coefficients
       }
 
       // Check for convergence.
-      rel_difference = Difference(coefs_, residuals, optimum.coefs, optimum.residuals,
-                                  LossHasDifferenceOp{}, PenaltyHasDifferenceOp{});
+      const double new_objf_value = loss_->Evaluate(optimum.residuals) + penalty_->Evaluate(optimum.coefs);
+      rel_difference = objf_value - new_objf_value;
 
       iter_metrics.AddDetail("iter", iter);
       iter_metrics.AddDetail("rel_difference", rel_difference);
       // iter_metrics.AddDetail("coef_norm_diff", arma::norm(coefs_.beta - optimum.coefs.beta, 2));
       // iter_metrics.AddDetail("resid_norm_diff", arma::norm(residuals - optimum.residuals, 2));
-      // iter_metrics.AddDetail("objf_value", optimum.objf_value);
-      // iter_metrics.AddDetail("objf_value_improve", objf_value - optimum.objf_value);
+      iter_metrics.AddDetail("objf_value", new_objf_value);
       iter_metrics.AddDetail("inner_tol", tightener->current_tolerance());
+
+      // Check if the value of the convex surrogate decreased. This can only fail if the inner optimizer is using an
+      // iterative scheme and the relative tolerance is too large.
+      if (IsIterativeAlgorithmTag::value) {
+        if (objf_value > 0 && rel_difference < -convergence_tolerance_) {
+          // The value of the objective function increased noticable.
+          // Decrease the inner convergence tolerance considerably and continue iterating the current surrogate,
+          // i.e., don't update the coefficients or the surrogate.
+          // If the inner convergence tolerance is already very small, return the result as-is.
+          // (Any step increases the objective function, hence we are at a minimum.)
+          if (!tightener->CanTightenFurther()) {
+            metrics->AddMetric("iter", iter);
+            metrics->AddDetail("final_rel_difference", rel_difference);
+            metrics->AddDetail("final_innner_tol", tightener->current_tolerance());
+            return MakeOptimum(*loss_, *penalty_, coefs_, residuals, objf_value, std::move(metrics),
+                               OptimumStatus::kOk);
+          }
+          iter_metrics.AddDetail("tighten_faster", "yes");
+          tightener->FastTighten();
+          restart_inner = true;
+          continue;
+        }
+      }
 
       // The solutions are good enough. If we can make the inner optimizer tighter, add a few iteration and then
       // return the obtained optimum.
       if (rel_difference < convergence_tolerance_) {
         if (final_iterations || !tightener->CanTightenFurther()) {
           coefs_ = std::move(optimum.coefs);
+          metrics->AddMetric("iter", iter);
           metrics->AddDetail("final_rel_difference", rel_difference);
           metrics->AddDetail("final_innner_tol", tightener->current_tolerance());
-          metrics->AddMetric("iter", iter);
           // The value of the convex surrogate should be close enough (actually it should be equal) to the
           // true objective. Therefore, there is no need to re-evaluate the loss.
-          return MakeOptimum(*loss_, *penalty_, coefs_, optimum.residuals, optimum.objf_value, std::move(metrics));
+          return MakeOptimum(*loss_, *penalty_, coefs_, optimum.residuals, new_objf_value, std::move(metrics));
         } else {
           final_iterations = true;
           tightener->FullyTighten();
-        }
-      }
-
-      // Check if the value of the convex surrogate decreased. This can only fail if the inner optimizer is using an
-      // iterative scheme and the relative tolerance is too large.
-      if (IsIterativeAlgorithmTag::value) {
-        if (objf_value > 0 && (objf_value - optimum.objf_value) < 0) {
-          // The value of the objective function has not decreased.
-          // Decrease the inner convergence tolerance considerably and continue iterating the current surrogate,
-          // i.e., don't update the coefficients or the surrogate.
-          // If the inner convergence tolerance is already ridiculously small. Probably zig-zagging around
-          // the optimum.
-          if (!tightener->CanTightenFurther()) {
-            metrics->AddDetail("final_rel_difference", rel_difference);
-            metrics->AddDetail("final_innner_tol", tightener->current_tolerance());
-            metrics->AddMetric("iter", iter);
-            return MakeOptimum(*loss_, *penalty_, coefs_, residuals, objf_value, std::move(metrics),
-                               OptimumStatus::kOk, "Possibly imprecise solution.");
-          }
-          iter_metrics.AddDetail("tighten_faster", "yes");
-          tightener->FastTighten();
-          continue;
         }
       }
 
@@ -494,49 +506,28 @@ class MMOptimizer : public Optimizer<LossFunction, PenaltyFunction, Coefficients
       try {
         optimizer_.loss(loss_->GetConvexSurrogate(residuals));
       } catch(...) {
-        metrics->AddMetric("final_rel_difference", iter);
-        metrics->AddDetail("rel_difference", rel_difference);
+        metrics->AddMetric("iter", iter);
+        metrics->AddDetail("final_rel_difference", rel_difference);
         metrics->AddDetail("final_innner_tol", tightener->current_tolerance());
         return MakeOptimum(*loss_, *penalty_, coefs_, residuals, std::move(metrics), OptimumStatus::kWarning,
                            "MM-algorithm did not converge");
       }
-      optimizer_.penalty(penalty_->GetConvexSurrogate(residuals));
+      optimizer_.penalty(penalty_->GetConvexSurrogate(coefs_));
 
       // Retain value of the objective function to check for improvement.
-      objf_value = loss_->Evaluate(residuals) + penalty_->Evaluate(coefs_);
+      objf_value = new_objf_value;
     }
 
-    metrics->AddMetric("final_rel_difference", iter);
-    metrics->AddDetail("rel_difference", rel_difference);
+    metrics->AddMetric("iter", iter);
+    metrics->AddDetail("final_rel_difference", rel_difference);
     metrics->AddDetail("final_innner_tol", tightener->current_tolerance());
     return MakeOptimum(*loss_, *penalty_, coefs_, residuals, std::move(metrics), OptimumStatus::kWarning,
                        "MM-algorithm did not converge");
   }
 
  private:
-  //! Get the difference between two coefficients if the loss and penalty functions both have a `Difference` operator.
-  double Difference(const Coefficients& c1, const ResidType& r1, const Coefficients& c2, const ResidType&,
-                    std::true_type, std::true_type) const {
-    return loss_->Difference(c1, c2) + penalty_->Difference(c1, c2);
-  }
-  //! Get the difference between two coefficients if only the loss has a `Difference` operator.
-  double Difference(const Coefficients& c1, const ResidType& r1, const Coefficients& c2, const ResidType&,
-                    std::true_type, std::false_type) const {
-    return loss_->Difference(c1, c2) + std::abs(penalty_->Evaluate(c1) - penalty_->Evaluate(c2));
-  }
-  //! Get the difference between two coefficients if only the penalty has a `Difference` operator.
-  double Difference(const Coefficients& c1, const ResidType& r1, const Coefficients& c2, const ResidType& r2,
-                    std::false_type, std::true_type) const {
-    return std::abs(loss_->Evaluate(r1) - loss_->Evaluate(r2)) + penalty_->Difference(c1, c2);
-  }
-  //! Get the difference between two coefficients if neither the loss nor the penalty has a `Difference` operator.
-  double Difference(const Coefficients& c1, const ResidType& r1, const Coefficients& c2, const ResidType& r2,
-                    std::false_type, std::false_type) const {
-    return std::abs(loss_->Evaluate(r1) + penalty_->Evaluate(c1) - (loss_->Evaluate(r2) + penalty_->Evaluate(c2)));
-  }
-
   double InnerConvergenceTolerance(std::true_type) const noexcept {
-    return optimizer_.convergence_tolerance();
+    return 0.5 * optimizer_.convergence_tolerance();
   }
 
   constexpr double InnerConvergenceTolerance(std::false_type) const noexcept {

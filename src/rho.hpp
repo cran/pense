@@ -116,6 +116,10 @@ class RhoBisquare {
   arma::vec Derivative(const arma::vec& x, const double scale) const noexcept;
   void      Derivative(const arma::vec& x, const double scale, arma::vec* out) const noexcept;
 
+  //! Compute the Newton step for root-finding of the M-scale equation in one pass over the vector `x`.
+  //! This function computes mean(rho(x / scale; cc) - delta) / mean(rho'(x / scale; cc) * x / scale)
+  double    DerivativeFixedPoint(const arma::vec& x, const double scale, const double delta) const noexcept;
+
   //! Get the derivative of the *standardized* rho function evaluated at x/scale.
   //! Note that DerivativeStd(x/scale, 1) == DerivativeStd(x, scale) / scale.
   //! This is equivalent to `robustbase::Mchi(x / scale, cc, 'bisquare', deriv = 1)`.
@@ -131,7 +135,7 @@ class RhoBisquare {
   void      SecondDerivative(const arma::vec& x, const double scale, arma::vec* out) const noexcept;
 
   //! Get the second derivative of the *standardized* rho function evaluated at x/scale.
-  //! Note that SecondDerivative(x/scale, 1) == SecondDerivative(x, scale)
+  //! Note that SecondDerivativeStd(x/scale, 1) == SecondDerivativeStd(x, scale) * scale^2
   //! This is equivalent to `robustbase::Mchi(x / scale, cc, 'bisquare', deriv = 2)`.
   double    SecondDerivativeStd(double x, const double scale) const noexcept;
   arma::vec SecondDerivativeStd(const arma::vec& x, const double scale) const noexcept;

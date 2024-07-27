@@ -23,24 +23,24 @@ x[3:6, 4:6] <- 1.5 * max(x) + abs(rcauchy(4 * 3))
 #  set.seed(1234)
 #  fit_075 <- adapense_cv(x, y, alpha = 0.75, cv_k = 5, cv_repl = 3, cl = cluster)
 
-## ---- eval=FALSE, include=FALSE-----------------------------------------------
+## ----eval=FALSE, include=FALSE------------------------------------------------
 #  fit_075_3repl <- fit_075
 
-## ---- include=FALSE-----------------------------------------------------------
+## ----include=FALSE------------------------------------------------------------
 fit_075 <- fit_075_3repl
 
-## ---- fig.width=7, fig.height=5, fig.cap="Estimated prediction accuracy using 3 replications of 5-fold CV."----
+## ----fig.width=7, fig.height=5, fig.cap="Estimated prediction accuracy using 3 replications of 5-fold CV."----
 plot(fit_075)
 
-## ---- eval=FALSE--------------------------------------------------------------
+## ----eval=FALSE---------------------------------------------------------------
 #  set.seed(1234)
 #  fit_075 <- adapense_cv(x, y, alpha = 0.75, cv_k = 5, cv_repl = 10, cl = cluster)
 #  plot(fit_075)
 
-## ---- eval=FALSE, include=FALSE-----------------------------------------------
+## ----eval=FALSE, include=FALSE------------------------------------------------
 #  fit_075_10repl <- fit_075
 
-## ---- fig.width=7, fig.height=5, echo=FALSE, fig.cap="Estimated prediction accuracy using 10 replications of 5-fold CV."----
+## ----fig.width=7, fig.height=5, echo=FALSE, fig.cap="Estimated prediction accuracy using 10 replications of 5-fold CV."----
 fit_075 <- fit_075_10repl
 plot(fit_075)
 
@@ -72,7 +72,7 @@ prediction_performance(fit_exp_1, fit_exp_2, fit_exp_3, lambda = '3-se')
 ## -----------------------------------------------------------------------------
 summary(fit_exp_3, alpha = 0.75, lambda = '3-se')
 
-## ---- eval=FALSE--------------------------------------------------------------
+## ----eval=FALSE---------------------------------------------------------------
 #  mae <- function (prediction_errors) {
 #    mean(abs(prediction_errors))
 #  }
@@ -80,7 +80,7 @@ summary(fit_exp_3, alpha = 0.75, lambda = '3-se')
 #  set.seed(1234)
 #  fit_075_mae <- adapense_cv(x, y, alpha = 0.75, cv_k = 5, cv_repl = 5, cl = cluster, cv_metric = mae)
 
-## ---- eval=FALSE, include=FALSE-----------------------------------------------
+## ----eval=FALSE, include=FALSE------------------------------------------------
 #  save(fit_075_10repl, fit_075_3repl, fit_075_mae, fit_exp_1, fit_exp_2, fit_exp_3,
 #       file = 'computing_adapense_fits.RData')
 

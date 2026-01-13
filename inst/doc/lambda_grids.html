@@ -12,7 +12,7 @@
 
 <meta name="author" content="David Kepplinger" />
 
-<meta name="date" content="2024-07-26" />
+<meta name="date" content="2026-01-12" />
 
 <title>Controlling the grid of penalization levels</title>
 
@@ -50,8 +50,9 @@ overflow: visible;
 }
 </style>
 <style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -62,7 +63,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
 { counter-reset: source-line 0; }
@@ -341,7 +342,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <h1 class="title toc-ignore">Controlling the grid of penalization
 levels</h1>
 <h4 class="author">David Kepplinger</h4>
-<h4 class="date">2024-07-26</h4>
+<h4 class="date">2026-01-12</h4>
 
 
 
@@ -438,12 +439,9 @@ compute them manually via</p>
 <span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>exponent <span class="ot">&lt;-</span> <span class="dv">1</span></span>
 <span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>penalty_loadings <span class="ot">&lt;-</span> <span class="dv">1</span> <span class="sc">/</span> <span class="fu">abs</span>(<span class="fu">coef</span>(fit_preliminary)[<span class="sc">-</span><span class="dv">1</span>])<span class="sc">^</span>exponent</span>
 <span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>fit_adaptive <span class="ot">&lt;-</span> <span class="fu">pense_cv</span>(x, y, <span class="at">alpha =</span> <span class="fl">0.75</span>, <span class="at">cv_k =</span> <span class="dv">5</span>, <span class="at">cv_repl =</span> <span class="dv">10</span>, <span class="at">lambda =</span> <span class="fu">c</span>(<span class="fl">5e-5</span>, <span class="fl">5e-4</span>, <span class="fl">5e-3</span>, <span class="fl">5e-2</span>, <span class="fl">5e-1</span>, <span class="dv">5</span>))</span></code></pre></div>
-<p>The function <code>pensem_cv()</code> allows finer control over the
-grids. It supports the argument <code>lambda=</code>, which would use
-the same grid of penalization levels for the S- and M-estimates. But
-<code>pensem_cv()</code> additionally supports arguments
-<code>lambda_s=</code> and <code>lambda_m=</code> to manually specify
-separate grids for the S- and the M-estimates.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">summary</span>(fit_adaptive)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="co">#&gt; Error in `x[[1L]][[&quot;alpha&quot;]]`:</span></span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="co">#&gt; ! subscript out of bounds</span></span></code></pre></div>
 </div>
 </div>
 

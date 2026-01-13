@@ -8,8 +8,6 @@
 
 #include "r_pense_regression.hpp"
 
-#include <unordered_set>
-
 #include "rcpp_integration.hpp"
 #include "r_interface_utils.hpp"
 #include "alias.hpp"
@@ -61,6 +59,7 @@ constexpr bool kDefaultStrategyEnpyShared = true;
 constexpr bool kDefaultStrategyEnpyIndividual = false;
 constexpr bool kDefaultStrategyOtherShared = true;
 constexpr bool kDefaultStrategyOtherIndividual = false;
+constexpr bool kDefaultReturnResiduals = false;
 constexpr int kDefaultNumberOfThreads = 1;
 
 //! Expand a list of PY Results to a list of start coefficients.
@@ -246,7 +245,7 @@ SEXP PenseRegressionImpl(SOptimizer optimizer, SEXP r_x, SEXP r_y, SEXP r_penalt
 
   ConstRegressionDataPtr data(MakePredictorResponseData(r_x, r_y));
 
-  pense::Mscale<pense::RhoBisquare> mscale(as<RList>(pense_opts["mscale"]));
+  pense::Mscale mscale(as<RList>(pense_opts["mscale"]));
   SLoss loss(data, mscale, as<bool>(pense_opts["intercept"]));
   auto penalties = MakePenalties<SOptimizer>(r_penalties, optional_args);
 
@@ -314,6 +313,8 @@ SEXP PenseRegressionImpl(SOptimizer optimizer, SEXP r_x, SEXP r_y, SEXP r_penalt
       as<StartCoefficientsList<SOptimizer>>(optional_args["individual_starts"]));
   }
 
+  const bool include_residuals = GetFallback(pense_opts, "return_residuals", kDefaultReturnResiduals);
+
   RList combined_reg_path;
   while (!reg_path.End()) {
     RList solutions;
@@ -330,7 +331,13 @@ SEXP PenseRegressionImpl(SOptimizer optimizer, SEXP r_x, SEXP r_y, SEXP r_penalt
         optimum.metrics->AddDetail("objf_value", optimum.objf_value);
         sub_metrics.AddSubMetrics(*optimum.metrics);
       }
-      solutions.push_back(WrapOptimum(optimum));
+
+      auto wrapped_opt = WrapOptimum(optimum);
+      wrapped_opt["scale"] = std::sqrt(2 * (optimum.objf_value - optimum.penalty(optimum.coefs)));
+      if (include_residuals) {
+        wrapped_opt["residuals"] = optimum.residuals;
+      }
+      solutions.push_back(std::move(wrapped_opt));
     }
     combined_reg_path.push_back(solutions);
     Rcpp::checkUserInterrupt();
@@ -574,10 +581,13 @@ SEXP PenseMaxLambda(SEXP r_x, SEXP r_y, SEXP r_pense_opts, SEXP r_optional_args)
   auto data = MakePredictorResponseData(r_x, r_y);
   const auto pense_opts = as<Rcpp::List>(r_pense_opts);
   const auto optional_args = as<Rcpp::List>(r_optional_args);
-  pense::Mscale<pense::RhoBisquare> mscale(as<Rcpp::List>(pense_opts["mscale"]));
-  const auto locscale = MLocationScale(data->cy(), mscale, mscale.rho());
+  const auto mscale_opts = as<Rcpp::List>(pense_opts["mscale"]);
+
+  const Mscale mscale(mscale_opts);
+  auto rho = mscale.rho();
+  auto locscale = MLocationScale(data->cy(), mscale, *rho);
   const arma::vec residuals = data->cy() - locscale.location;
-  arma::vec weights = residuals % mscale.rho().Weight(residuals, locscale.scale);
+  arma::vec weights = residuals % rho->Weight(residuals, locscale.scale);
   const double denom = arma::mean(weights % residuals);
   weights *= locscale.scale * locscale.scale / denom;
 

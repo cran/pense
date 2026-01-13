@@ -12,9 +12,12 @@ pense_cv(
   lambda,
   cv_k,
   cv_repl = 1,
+  cv_type = c("ris", "naive"),
   cv_metric = c("tau_size", "mape", "rmspe", "auroc"),
+  ris_min_similarity = 0.5,
   fit_all = TRUE,
   fold_starts = c("full", "enpy", "both"),
+  cv_algorithm_opts,
   cl = NULL,
   ...
 )
@@ -44,7 +47,11 @@ the data manually.}
 
 \item{cv_repl}{number of cross-validation replications.}
 
-\item{cv_metric}{either a string specifying the performance metric to use, or a function to
+\item{cv_type}{what kind of cross-validation should be performed:
+robust information sharing (\code{ris}) or standard (\code{naive}) CV.}
+
+\item{cv_metric}{only for \code{cv_type='naive'}.
+Either a string specifying the performance metric to use, or a function to
 evaluate prediction errors in a single CV replication.
 If a function, the number of arguments define the data the function receives.
 If the function takes a single argument, it is called with a single numeric vector of
@@ -54,7 +61,13 @@ first argument and the true values as second argument.
 The function must always return a single numeric value quantifying the prediction performance.
 The order of the given values corresponds to the order in the input data.}
 
-\item{fit_all}{If \code{TRUE}, fit the model for all penalization levels.
+\item{ris_min_similarity}{minimum average similarity of the CV solutions to be considered
+(between 0 and 1).
+If no CV solution satisfies this lower bound, the best CV solution will be used regardless
+of similarity.}
+
+\item{fit_all}{only for \code{cv_type='naive'}.
+If \code{TRUE}, fit the model for all penalization levels.
 Can also be any combination of \code{"min"} and \code{"{x}-se"}, in which case only models at the
 penalization level with smallest average CV accuracy, or within \code{{x}} standard errors,
 respectively.
@@ -68,6 +81,10 @@ the fit to the full data as starting value. This implies
 If \code{"enpy"} compute separate ENPY initial estimates in each fold.
 The option \code{"both"} uses both.
 These starts are in addition to the starts provided in \code{other_starts}.}
+
+\item{cv_algorithm_opts}{Override algorithm options for the CV iterations.
+This is usually not necessary, unless the user wants to change the number of solutions
+retained for the CV training data.}
 
 \item{cl}{a \link[parallel:makeCluster]{parallel} cluster. Can only be used in combination with
 \code{ncores = 1}.}
@@ -100,15 +117,18 @@ point \code{bdp}. This affects the estimated coefficients only if
 \code{standardize=TRUE}. Otherwise only the estimated scale of the residuals
 would be affected.}
     \item{\code{eps}}{numerical tolerance.}
-    \item{\code{explore_solutions}}{number of solutions to compute up to the desired precision \code{eps}.}
+    \item{\code{explore_solutions}}{number of solutions to keep after the exploration step.
+The best \code{explore_solutions} are then iterated to full numerical tolerance \code{eps}.
+If 0, all non-duplicated solutions are kept.}
     \item{\code{explore_tol,explore_it}}{numerical tolerance and maximum number of iterations for
 exploring possible solutions. The tolerance should be (much) looser than \code{eps} to be useful,
 and the number of iterations should also be much smaller than the maximum number of
-iterations given via \code{algorithm_opts}.}
-    \item{\code{max_solutions}}{only retain up to \code{max_solutions} unique solutions per penalization level.}
+iterations given via \code{algorithm_opts}.
+\code{explore_tol} is also used to determine if two solutions are equal in the exploration stage.}
+    \item{\code{max_solutions}}{retain only up to \code{max_solutions} unique solutions per penalization level.}
     \item{\code{comparison_tol}}{numeric tolerance to determine if two solutions are equal.
 The comparison is first done on the absolute difference in the value of the objective
-function at the solution If this is less than \code{comparison_tol}, two solutions are deemed
+function at the solution. If this is less than \code{comparison_tol}, two solutions are deemed
 equal if the squared difference of the intercepts is less than \code{comparison_tol} and the
 squared \eqn{L_2} norm of the difference vector is less than \code{comparison_tol}.}
     \item{\code{add_zero_based}}{also consider the 0-based regularization path. See details for a
@@ -232,11 +252,11 @@ cross-validation.
 regularization path.
 
 Other functions to compute robust estimates with CV: 
-\code{\link{pensem_cv}()},
+\code{\link{change_cv_measure}()},
 \code{\link{regmest_cv}()}
 
 Other functions to compute robust estimates with CV: 
-\code{\link{pensem_cv}()},
+\code{\link{change_cv_measure}()},
 \code{\link{regmest_cv}()}
 }
 \concept{functions to compute robust estimates with CV}

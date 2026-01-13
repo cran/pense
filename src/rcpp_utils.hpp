@@ -11,11 +11,11 @@
 
 #include <string>
 #include <memory>
-#include <type_traits>
 
 #include "nsoptim.hpp"
 #include "constants.hpp"
 #include "enpy_types.hpp"
+#include "rho.hpp"
 
 namespace pense {
 //! Get an item from the list or use the fallback if the item does not exist.
@@ -91,9 +91,23 @@ inline nsoptim::MMConfiguration::TighteningType GetFallback<nsoptim::MMConfigura
   return fallback;
 }
 
+//! Get the Rho function defined in the options list
+inline std::shared_ptr<const RhoFunction> RhoFactory(const Rcpp::List& rho_opts) {
+  switch(GetFallback(rho_opts, "rho", RhoFunctionType::kRhoBisquare)) {
+  case RhoFunctionType::kRhoOptimal:
+    return std::make_shared<const RhoOptimal>(GetFallback(rho_opts, "cc", kDefaultOptimaleCc));
+    case RhoFunctionType::kRhoHuber:
+    return std::make_shared<const RhoHuber>(GetFallback(rho_opts, "cc", kDefaultHuberCc));
+    case RhoFunctionType::kRhoBisquare:
+    default:
+    return std::make_shared<const RhoBisquare>(GetFallback(rho_opts, "cc", kDefaultBisquareCc));
+  }
+}
+
 //! Wrap an Optimum for any EN-type penalty function into an R list.
 //!
 //! @param optimium the Optimum object.
+//! @param include_residuals whether to include the residuals in the returned list.
 //! @return the optimum as Rcpp::List.
 template <typename T>
 Rcpp::List WrapOptimum(const T& optimum) {

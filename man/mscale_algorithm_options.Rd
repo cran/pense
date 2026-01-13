@@ -4,9 +4,12 @@
 \alias{mscale_algorithm_options}
 \title{Options for the M-scale Estimation Algorithm}
 \usage{
-mscale_algorithm_options(max_it = 200, eps = 1e-08)
+mscale_algorithm_options(rho = "bisquare", max_it = 200, eps = 1e-08)
 }
 \arguments{
+\item{rho}{the \eqn{\rho} function to use. See \code{\link[=rho_function]{rho_function()}} for
+possible values.}
+
 \item{max_it}{maximum number of iterations.}
 
 \item{eps}{numerical tolerance to check for convergence.}
@@ -17,3 +20,9 @@ options for the M-scale estimation algorithm.
 \description{
 Options for the M-scale Estimation Algorithm
 }
+\seealso{
+Other Robustness control options: 
+\code{\link{consistency_const}()},
+\code{\link{rho_function}()}
+}
+\concept{Robustness control options}

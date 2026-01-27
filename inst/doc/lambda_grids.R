@@ -16,11 +16,11 @@ x[3:6, 4:6] <- 1.5 * max(x) + abs(rcauchy(4 * 3))
 
 ## ----eval=FALSE---------------------------------------------------------------
 # set.seed(1234)
-# fit_grid_narrow <- adapense_cv(x, y, alpha = 0.75, lambda_min_ratio = 1e-1, cv_k = 5, cv_repl = 10)
+# fit_grid_narrow <- adapense_cv(x, y, alpha = 0.75, lambda_min_ratio = 5e-1, cv_k = 5, cv_repl = 10)
 
 ## ----eval=FALSE---------------------------------------------------------------
 # set.seed(1234)
-# fit_grid_wide <- adapense_cv(x, y, alpha = 0.75, lambda_min_ratio = 1e-6, cv_k = 5, cv_repl = 10)
+# fit_grid_wide <- adapense_cv(x, y, alpha = 0.75, lambda_min_ratio = 5e-2, cv_k = 5, cv_repl = 10)
 
 ## ----fig.width=6.5, fig.show='hold', echo=FALSE, fig.cap="Prediction performance of models estimated on different grids of the penalization level: (a) narrow grid with `lambda_min_ratio=1e-1`, (b) wide grid with `lambda_min_ratio=1e-6`."----
 layout(matrix(1:2, nrow = 1, byrow = TRUE))
@@ -36,16 +36,18 @@ par(prev_par)
 
 ## ----eval=FALSE---------------------------------------------------------------
 # set.seed(1234)
-# fit_grid_focused <- adapense_cv(x, y, alpha = 0.75, lambda_min_ratio = 1e-2, cv_k = 5, cv_repl = 10)
+# fit_grid_focused <- adapense_cv(x, y, alpha = 0.75, lambda_min_ratio = 1e-1, cv_k = 5, cv_repl = 10)
 
 ## ----echo=FALSE, fig.width=5, fig.height=4, fig.cap="Prediction performance of models estimated over a well-focused grid of penalization levels."----
 plot(fit_grid_focused)
 
 ## ----eval=FALSE---------------------------------------------------------------
-# fit_preliminary <- pense_cv(x, y, alpha = 0, cv_k = 5, cv_repl = 10, lambda = c(1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1))
+# fit_preliminary <- pense_cv(x, y, alpha = 0, cv_k = 5, cv_repl = 10,
+#                             lambda = exp(seq(log(0.5), log(20), length.out = 5)))
 # exponent <- 1
 # penalty_loadings <- 1 / abs(coef(fit_preliminary)[-1])^exponent
-# fit_adaptive <- pense_cv(x, y, alpha = 0.75, cv_k = 5, cv_repl = 10, lambda = c(5e-5, 5e-4, 5e-3, 5e-2, 5e-1, 5))
+# fit_adaptive <- pense_cv(x, y, alpha = 0.75, cv_k = 5, cv_repl = 10,
+#                          lambda = exp(seq(log(0.1), log(2), length.out = 5)))
 
 ## -----------------------------------------------------------------------------
 summary(fit_adaptive)

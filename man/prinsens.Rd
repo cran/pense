@@ -14,8 +14,7 @@ prinsens(
   en_algorithm_opts,
   eps = 1e-06,
   sparse = FALSE,
-  ncores = 1L,
-  method = deprecated()
+  ncores = 1L
 )
 }
 \arguments{
@@ -43,9 +42,6 @@ penalization of each coefficient. Only allowed for \code{alpha} > 0.}
 
 \item{ncores}{number of CPU cores to use in parallel. By default, only one CPU core is used.
 Not supported on all platforms, in which case a warning is given.}
-
-\item{method}{defunct. PSCs are always computed for EN estimates. For the PY procedure for unpenalized estimation
-use package \href{https://cran.r-project.org/package=pyinit}{pyinit}.}
 }
 \value{
 a list of principal sensitivity components, one per element in \code{lambda}. Each PSC is itself a list

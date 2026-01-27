@@ -5,10 +5,20 @@ load("computing_adapense_fits.RData")
 ## -----------------------------------------------------------------------------
 library(pense)
 
-## -----------------------------------------------------------------------------
+## ----eval=FALSE---------------------------------------------------------------
+# library(parallel)
+# # If you don't know how many CPU cores are available, first run `detectCores(logical = FALSE)`
+# cluster <- makeCluster(2)
+
+## ----include=FALSE------------------------------------------------------------
 library(parallel)
-# If you don't know how many CPU cores are available, first run `detectCores(logical = FALSE)`
-cluster <- makeCluster(3)
+USE_CPUS <- Sys.getenv("PENSE_VIGNETTES_MAX_CPUS", unset = "2") |> 
+  as.integer()
+cluster <- if (isTRUE(USE_CPUS > 1)) {
+  makeCluster(USE_CPUS)
+} else {
+  NULL
+}
 
 ## -----------------------------------------------------------------------------
 set.seed(1234)
